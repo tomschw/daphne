@@ -892,9 +892,16 @@ mlir::LogicalResult mlir::daphne::MatMulOp::canonicalize(
     mlir::Value rhs = op.rhs();
     mlir::Value transa = op.transa();
     mlir::Value transb = op.transb();
+    bool ta = false;
+    bool tb = false;
 
-    bool ta = false; //TODO: Get bool value from transa to fix nested transpose rewrites
-    bool tb = false; //TODO: Get bool value from transb to fix nested transpose rewrites
+    if(auto co = transa.getDefiningOp<mlir::daphne::ConstantOp>()) {
+        ta = co.value().dyn_cast<mlir::BoolAttr>().getValue();
+    }
+    if(auto co = transb.getDefiningOp<mlir::daphne::ConstantOp>()) {
+        tb = co.value().dyn_cast<mlir::BoolAttr>().getValue();
+    }
+
 
     mlir::daphne::TransposeOp lhsTransposeOp = lhs.getDefiningOp<mlir::daphne::TransposeOp>();
     mlir::daphne::TransposeOp rhsTransposeOp = rhs.getDefiningOp<mlir::daphne::TransposeOp>();

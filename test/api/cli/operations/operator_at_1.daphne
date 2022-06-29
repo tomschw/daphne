@@ -11,13 +11,9 @@ print(C);
 
 print(B@B);
 print(t(B)@t(B));
-
-//enable when nesting is fixed
-//print(t(t(B))@t(t(B)));
+print(t(t(B))@t(t(B)));
 
 print(A@C);
 print(t(A)@A);
 print(A@t(A));
-
-//enable when nesting is fixed
-//print(t(t(A))@t(t(t(A))));
+print(t(t(A))@t(t(t(A))));

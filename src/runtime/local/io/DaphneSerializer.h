@@ -359,6 +359,21 @@ struct DaphneSerializer<Frame> {
    };
 };
 
+template <>
+struct DaphneSerializer<const Structure> {
+    static size_t length(const Structure *arg) {
+        throw std::runtime_error("not implemented");
+    };
+
+    static void *save(const Structure *arg, void *buf) {
+        throw std::runtime_error("not implemented");
+    };
+
+   static Structure *load(const void *buf) {
+       throw std::runtime_error("not implemented");
+   };
+};
+
 inline Structure *DF_load(const void *buf) {
     if (DF_Dtype(buf) == DF_data_t::DenseMatrix_t) {
         switch(DF_Vtype(buf)) {

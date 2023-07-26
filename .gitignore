@@ -2,6 +2,12 @@
 build/
 build-*/
 build_*/
+/bin
+/lib
+/tmp
+
+# documentation build output
+doc_build/
 
 # dependencies
 thirdparty/*
@@ -13,9 +19,20 @@ thirdparty/*
 
 # Python
 __pycache__/
+/**/*venv*
 
 # Jetbrains IDE
 .idea/
-cmake-*/
+.clion.source.upload.marker
 
 tmpdaphne.daphne
+
+# release scripts output
+/artifacts
+
+bin/
+logs/
+profiler/
+precompiled-dependencies/
+/cmake*/
+/data

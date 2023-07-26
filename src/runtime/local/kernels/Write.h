@@ -66,8 +66,31 @@ struct Write<DenseMatrix<VT>> {
 		writeCsv(arg, file);
 		closeFile(file);
 	} else if (ext == "dbdf") {
+        FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+        MetaDataParser::writeMetaData(filename, metaData);
 		writeDaphne(arg, filename);
 	}
+    }
+};
+
+// ----------------------------------------------------------------------------
+// Frame
+// ----------------------------------------------------------------------------
+
+template<>
+struct Write<Frame> {
+    static void apply(const Frame * arg, const char * filename, DCTX(ctx)) {
+        File * file = openFileForWrite(filename);
+        std::vector<ValueTypeCode> vtcs;
+        std::vector<std::string> labels;
+        for(size_t i = 0; i < arg->getNumCols(); i++) {
+            vtcs.push_back(arg->getSchema()[i]);
+            labels.push_back(arg->getLabels()[i]);
+        }
+        FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
+        MetaDataParser::writeMetaData(filename, metaData);
+        writeCsv(arg, file);
+        closeFile(file);
     }
 };
 

@@ -20,14 +20,15 @@
 # Modifications Copyright 2022 The DAPHNE Consortium
 #
 # -------------------------------------------------------------
-from typing import (TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple,
-                    Union)
-from api.python.script_building.dag import OutputType
-from api.python.utils.consts import VALID_INPUT_TYPES, VALID_ARITHMETIC_TYPES
-import numpy as np
-from typing import Iterable
 
 from api.python.operator.operation_node import OperationNode
+from api.python.script_building.dag import OutputType
+from api.python.utils.consts import VALID_INPUT_TYPES, VALID_ARITHMETIC_TYPES
+
+import numpy as np
+
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple, Union
+
 if TYPE_CHECKING:
     # to avoid cyclic dependencies during runtime
     from context.daphne_context import DaphneContext
@@ -38,7 +39,7 @@ class Scalar(OperationNode):
     def __init__(self, daphne_context: 'DaphneContext', operation: str,
                  unnamed_input_nodes: Iterable[VALID_INPUT_TYPES] = None,
                  named_input_nodes: Dict[str, VALID_INPUT_TYPES] = None,
-                 output_type: OutputType = OutputType.DOUBLE,
+                 output_type: OutputType = OutputType.SCALAR,
                  assign: bool = False) -> 'Scalar':
         self.__assign = assign
         super().__init__(daphne_context, operation, unnamed_input_nodes=unnamed_input_nodes,
@@ -124,3 +125,6 @@ class Scalar(OperationNode):
     
     def sqrt(self) -> 'Scalar':
         return Scalar(self.daphne_context,'sqrt',[self])
+    
+    def print(self):
+        return OperationNode(self.daphne_context,'print',[self], output_type=OutputType.NONE)

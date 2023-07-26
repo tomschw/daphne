@@ -26,14 +26,50 @@
 # Stop immediately if any command fails.
 set -e
 
+catch2_options=""
+BUILD_CUDA=""
+BUILD_FPGAOPENCL=""
+BUILD_DEBUG=""
+BUILD_DAPHNE=1
+
+while [[ $# -gt 0 ]]; do
+    key=$1
+    shift
+    case $key in
+        --cuda)
+            echo using CUDA
+            export BUILD_CUDA="--cuda"
+            ;;
+        --fpgaopencl)
+            echo using FPGAOPENCL
+            export BUILD_FPGAOPENCL="--fpgaopencl"
+            ;;
+        --debug)
+            echo building DEBUG version
+            export BUILD_DEBUG="--debug"
+            ;;
+        -nb | --no-build)
+            BUILD_DAPHNE=0
+            ;;
+        *)
+            catch2_options="${catch2_options} ${key}"
+            ;;
+    esac
+done
+
 # Build tests.
-./build.sh --target run_tests
+if [ $BUILD_DAPHNE -gt 0 ]; then
+  ./build.sh $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG --target run_tests
+fi
 
 # Preparations for running DaphneLib (Python API) tests.
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src/
-mkdir --parents src/api/python/tmp
+export PYTHONPATH="$PYTHONPATH:$PWD/src/"
+
+# this speeds up the vectorized tests
+export OPENBLAS_NUM_THREADS=1
 
 # Run tests.
-build/test/run_tests $@
+# shellcheck disable=SC2086
+./bin/run_tests $catch2_options
 
 set +e

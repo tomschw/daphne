@@ -32,5 +32,5 @@ add_library(SQLParser STATIC
 )
 
 target_link_libraries(SQLParser PRIVATE
-        antlr4_static
+        antlr4_shared
 )

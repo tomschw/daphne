@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
 #include <ir/daphneir/Passes.h>
 
@@ -38,36 +39,16 @@ using namespace mlir;
  */
 // TODO This is not always correct for idxMin() and idxMax(): while their output always has an integer value
 // type, it is not always safe to cast their input to integers.
-struct AdaptTypesToKernelsPass : public PassWrapper<AdaptTypesToKernelsPass, FunctionPass>
+struct AdaptTypesToKernelsPass : public PassWrapper<AdaptTypesToKernelsPass, OperationPass<func::FuncOp>>
 {
-    void runOnFunction() final;
+    void runOnOperation() final;
 };
 
-// TODO This should become a general utility.
-Type getValueType(Type t) {
-    if(auto mt = t.dyn_cast<daphne::MatrixType>())
-        return mt.getElementType();
-    if(auto ft = t.dyn_cast<daphne::FrameType>())
-        throw std::runtime_error("getValueType() doesn't support frames yet"); // TODO
-    else // TODO Check if this is really a scalar.
-        return t;
-}
-
-// TODO This should become a general utility.
-Type setValueType(Type t, Type vt) {
-    if(auto mt = t.dyn_cast<daphne::MatrixType>())
-        return mt.withElementType(vt);
-    if(auto ft = t.dyn_cast<daphne::FrameType>())
-        throw std::runtime_error("setValueType() doesn't support frames yet"); // TODO
-    else // TODO Check if this is really a scalar.
-        return vt;
-}
-
-void AdaptTypesToKernelsPass::runOnFunction()
+void AdaptTypesToKernelsPass::runOnOperation()
 {
-    FuncOp f = getFunction();
+    func::FuncOp f = getOperation();
     OpBuilder builder(f.getContext());
-    f.body().front().walk([&](Operation* op) {
+    f.getBody().front().walk([&](Operation* op) {
         const size_t numOperands = op->getNumOperands();
 
         // Depending on the related trait, detemine which inputs to harmonize with the output.
@@ -93,17 +74,17 @@ void AdaptTypesToKernelsPass::runOnFunction()
                 })
             )) {
                 // Insert casts where necessary.
-                Type resVTy = getValueType(resTy);
+                Type resVTy = CompilerUtils::getValueType(resTy);
                 builder.setInsertionPoint(op);
                 for(size_t i : operandIdxs) {
                     Value argVal = op->getOperand(i);
                     Type argTy = argVal.getType();
-                    if(getValueType(argTy) != resVTy) {
+                    if(CompilerUtils::getValueType(argTy) != resVTy) {
                         op->setOperand(
                                 i,
                                 builder.create<daphne::CastOp>(
                                         argVal.getLoc(),
-                                        setValueType(argTy, resVTy),
+                                        CompilerUtils::setValueType(argTy, resVTy),
                                         argVal
                                 )
                         );

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <compiler/CompilerUtils.h>
+#include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
 #include <parser/daphnedsl/DaphneDSLBuiltins.h>
 #include <runtime/local/datastructures/Frame.h>
@@ -80,44 +80,42 @@ mlir::Value DaphneDSLBuiltins::createNumOp(mlir::Location loc, const std::string
     ));
 }
 
-template<class EwUnaryOp>
-mlir::Value DaphneDSLBuiltins::createEwUnaryOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args) {
+template<class UnaryOp>
+mlir::Value DaphneDSLBuiltins::createUnaryOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args) {
     checkNumArgsExact(func, args.size(), 1);
-    return utils.retValWithInferedType(builder.create<EwUnaryOp>(
+    return utils.retValWithInferedType(builder.create<UnaryOp>(
             loc, utils.unknownType, args[0]
     ));
 }
 
-template<class EwBinaryOp>
-mlir::Value DaphneDSLBuiltins::createEwBinaryOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args) {
+template<class BinaryOp>
+mlir::Value DaphneDSLBuiltins::createBinaryOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args) {
     checkNumArgsExact(func, args.size(), 2);
-    return utils.retValWithInferedType(builder.create<EwBinaryOp>(
-            loc, args[0], args[1]
+    return utils.retValWithInferedType(builder.create<BinaryOp>(
+            loc, utils.unknownType, args[0], args[1]
     ));
 }
 
 template<class RowAggOp, class ColAggOp>
 mlir::Value DaphneDSLBuiltins::createRowOrColAggOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args) {
     checkNumArgsExact(func, args.size(), 2);
-    if(auto co = args[1].getDefiningOp<mlir::daphne::ConstantOp>()) {
-        llvm::APInt axis = co.value().dyn_cast<mlir::IntegerAttr>().getValue();
-        if(axis == 0)
-            return utils.retValWithInferedType(
-                    builder.create<RowAggOp>(
-                            loc, utils.unknownType, args[0]
-                    )
-            );
-        else if(axis == 1)
-            return utils.retValWithInferedType(
-                    builder.create<ColAggOp>(
-                            loc, utils.unknownType, args[0]
-                    )
-            );
-        else
-            throw std::runtime_error("invalid axis");
-    }
+    int64_t axis = CompilerUtils::constantOrThrow<int64_t>(
+            args[1], "second argument of aggregation must be a constant"
+    );
+    if(axis == 0)
+        return utils.retValWithInferedType(
+                builder.create<RowAggOp>(
+                        loc, utils.unknownType, args[0]
+                )
+        );
+    else if(axis == 1)
+        return utils.retValWithInferedType(
+                builder.create<ColAggOp>(
+                        loc, utils.unknownType, args[0]
+                )
+        );
     else
-        throw std::runtime_error("second argument of aggregation must be a constant");
+        throw std::runtime_error("invalid axis");
 }
 
 template<class GrpAggOp>
@@ -170,7 +168,7 @@ mlir::Value DaphneDSLBuiltins::createSameTypeUnaryOp(mlir::Location loc, const s
 mlir::Value DaphneDSLBuiltins::createTriOp(mlir::Location loc, const std::string & func, const std::vector<mlir::Value> & args, bool upper) {
     checkNumArgsExact(func, args.size(), 3);
     mlir::Value arg = args[0];
-    mlir::Value upper2 = builder.create<mlir::daphne::ConstantOp>(loc, builder.getIntegerAttr(builder.getI1Type(), upper));
+    mlir::Value upper2 = builder.create<mlir::daphne::ConstantOp>(loc, upper);
     mlir::Value diag = utils.castBoolIf(args[1]);
     mlir::Value values = utils.castBoolIf(args[2]);
     return static_cast<mlir::Value>(builder.create<mlir::daphne::TriOp>(
@@ -438,51 +436,51 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
     // --------------------------------------------------------------------
 
     if(func == "abs")
-        return createEwUnaryOp<EwAbsOp>(loc, func, args);
+        return createUnaryOp<EwAbsOp>(loc, func, args);
     if(func == "sign")
-        return createEwUnaryOp<EwSignOp>(loc, func, args);
+        return createUnaryOp<EwSignOp>(loc, func, args);
     if(func == "exp")
-        return createEwUnaryOp<EwExpOp>(loc, func, args);
+        return createUnaryOp<EwExpOp>(loc, func, args);
     if(func == "ln")
-        return createEwUnaryOp<EwLnOp>(loc, func, args);
+        return createUnaryOp<EwLnOp>(loc, func, args);
     if(func == "mod")
-        return createEwBinaryOp<EwModOp>(loc, func, args);
+        return createBinaryOp<EwModOp>(loc, func, args);
     if(func == "sqrt")
-        return createEwUnaryOp<EwSqrtOp>(loc, func, args);
+        return createUnaryOp<EwSqrtOp>(loc, func, args);
 
     // --------------------------------------------------------------------
     // Rounding
     // --------------------------------------------------------------------
 
     if(func == "round")
-        return createEwUnaryOp<EwRoundOp>(loc, func, args);
+        return createUnaryOp<EwRoundOp>(loc, func, args);
     if(func == "floor")
-        return createEwUnaryOp<EwFloorOp>(loc, func, args);
+        return createUnaryOp<EwFloorOp>(loc, func, args);
     if(func == "ceil")
-        return createEwUnaryOp<EwCeilOp>(loc, func, args);
+        return createUnaryOp<EwCeilOp>(loc, func, args);
 
     // --------------------------------------------------------------------
     // Trigonometric
     // --------------------------------------------------------------------
 
     if(func == "sin")
-        return createEwUnaryOp<EwSinOp>(loc, func, args);
+        return createUnaryOp<EwSinOp>(loc, func, args);
     if(func == "cos")
-        return createEwUnaryOp<EwCosOp>(loc, func, args);
+        return createUnaryOp<EwCosOp>(loc, func, args);
     if(func == "tan")
-        return createEwUnaryOp<EwTanOp>(loc, func, args);
+        return createUnaryOp<EwTanOp>(loc, func, args);
     if(func == "sinh")
-        return createEwUnaryOp<EwSinhOp>(loc, func, args);
+        return createUnaryOp<EwSinhOp>(loc, func, args);
     if(func == "cosh")
-        return createEwUnaryOp<EwCoshOp>(loc, func, args);
+        return createUnaryOp<EwCoshOp>(loc, func, args);
     if(func == "tanh")
-        return createEwUnaryOp<EwTanhOp>(loc, func, args);
+        return createUnaryOp<EwTanhOp>(loc, func, args);
     if(func == "asin")
-        return createEwUnaryOp<EwAsinOp>(loc, func, args);
+        return createUnaryOp<EwAsinOp>(loc, func, args);
     if(func == "acos")
-        return createEwUnaryOp<EwAcosOp>(loc, func, args);
+        return createUnaryOp<EwAcosOp>(loc, func, args);
     if(func == "atan")
-        return createEwUnaryOp<EwAtanOp>(loc, func, args);
+        return createUnaryOp<EwAtanOp>(loc, func, args);
 
     // ********************************************************************
     // Elementwise binary
@@ -493,18 +491,18 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
     // --------------------------------------------------------------------
 
     if(func == "pow")
-        return createEwBinaryOp<EwPowOp>(loc, func, args);
+        return createBinaryOp<EwPowOp>(loc, func, args);
     if(func == "log")
-        return createEwBinaryOp<EwLogOp>(loc, func, args);
+        return createBinaryOp<EwLogOp>(loc, func, args);
 
     // --------------------------------------------------------------------
     // Min/max
     // --------------------------------------------------------------------
 
     if(func == "min")
-        return createEwBinaryOp<EwMinOp>(loc, func, args);
+        return createBinaryOp<EwMinOp>(loc, func, args);
     if(func == "max")
-        return createEwBinaryOp<EwMaxOp>(loc, func, args);
+        return createBinaryOp<EwMaxOp>(loc, func, args);
 
     // --------------------------------------------------------------------
     // Strings
@@ -516,6 +514,73 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
                 loc, StringType::get(builder.getContext()), args[0], args[1]
         ));
     }
+
+    // ********************************************************************
+    // Outer binary (generalized outer product)
+    // ********************************************************************
+
+    // --------------------------------------------------------------------
+    // Arithmetic
+    // --------------------------------------------------------------------
+
+    if(func == "outerAdd")
+        return createBinaryOp<OuterAddOp>(loc, func, args);
+    if(func == "outerSub")
+        return createBinaryOp<OuterSubOp>(loc, func, args);
+    if(func == "outerMul")
+        return createBinaryOp<OuterMulOp>(loc, func, args);
+    if(func == "outerDiv")
+        return createBinaryOp<OuterDivOp>(loc, func, args);
+    if(func == "outerPow")
+        return createBinaryOp<OuterPowOp>(loc, func, args);
+    if(func == "outerMod")
+        return createBinaryOp<OuterModOp>(loc, func, args);
+    if(func == "outerLog")
+        return createBinaryOp<OuterLogOp>(loc, func, args);
+
+    // --------------------------------------------------------------------
+    // Min/max
+    // --------------------------------------------------------------------
+
+    if(func == "outerMin")
+        return createBinaryOp<OuterMinOp>(loc, func, args);
+    if(func == "outerMax")
+        return createBinaryOp<OuterMaxOp>(loc, func, args);
+
+    // --------------------------------------------------------------------
+    // Logical
+    // --------------------------------------------------------------------
+
+    if(func == "outerAnd")
+        return createBinaryOp<OuterAndOp>(loc, func, args);
+    if(func == "outerOr")
+        return createBinaryOp<OuterOrOp>(loc, func, args);
+    if(func == "outerXor")
+        return createBinaryOp<OuterXorOp>(loc, func, args);
+
+    // --------------------------------------------------------------------
+    // Strings
+    // --------------------------------------------------------------------
+
+    if(func == "outerConcat")
+        return createBinaryOp<OuterConcatOp>(loc, func, args);
+
+    // --------------------------------------------------------------------
+    // Comparisons
+    // --------------------------------------------------------------------
+
+    if(func == "outerEq")
+        return createBinaryOp<OuterEqOp>(loc, func, args);
+    if(func == "outerNeq")
+        return createBinaryOp<OuterNeqOp>(loc, func, args);
+    if(func == "outerLt")
+        return createBinaryOp<OuterLtOp>(loc, func, args);
+    if(func == "outerLe")
+        return createBinaryOp<OuterLeOp>(loc, func, args);
+    if(func == "outerGt")
+        return createBinaryOp<OuterGtOp>(loc, func, args);
+    if(func == "outerGe")
+        return createBinaryOp<OuterGeOp>(loc, func, args);
 
     // ********************************************************************
     // Aggregation and statistical
@@ -596,21 +661,24 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         mlir::Value arg = args[0];
         std::vector<mlir::Value> colIdxs;
         std::vector<mlir::Value> ascs;
-        mlir::Value returnIdxs = args[numArgs - 1];
+        mlir::Value returnIdxs = utils.castBoolIf(args[numArgs - 1]);
         const size_t numCols = (numArgs - 2) / 2;
         for(size_t i = 0; i < numCols; i++) {
             colIdxs.push_back(utils.castSizeIf(args[1 + i]));
             ascs.push_back(utils.castBoolIf(args[1 + numCols + i]));
         }
         mlir::Type retTy;
-        if(auto co = returnIdxs.getDefiningOp<ConstantOp>()) {
-            if(co.value().dyn_cast<mlir::BoolAttr>().getValue())
+
+        std::pair<bool, bool> p = CompilerUtils::isConstant<bool>(returnIdxs);
+        if(p.first) {
+            if(p.second)
                 retTy = utils.matrixOfSizeType;
             else
                 retTy = args[0].getType();
         }
         else
             retTy = utils.unknownType;
+
         return static_cast<mlir::Value>(builder.create<OrderOp>(
                 loc, retTy, arg, colIdxs, ascs, returnIdxs
         ));
@@ -701,16 +769,46 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         ));
     }
     if(func == "ctable") {
-        checkNumArgsExact(func, numArgs, 2);
+        // The first two arguments are mandatory.
+        checkNumArgsMin(func, numArgs, 2);
         mlir::Value lhs = args[0];
         mlir::Value rhs = args[1];
-        // TODO Support all parameters of this operation again.
-//        mlir::Value weights = args[2];
-//        mlir::Value outHeight = utils.castSizeIf(args[3]);
-//        mlir::Value outWidth = utils.castSizeIf(args[4]);
-        return utils.retValWithInferedType(builder.create<CTableOp>(
-//                loc, utils.unknownType, lhs, rhs, weights, outHeight, outWidth
-                loc, utils.unknownType, lhs, rhs
+        // The remaining arguments are optional.
+        mlir::Value weight;
+        mlir::Value resNumRows;
+        mlir::Value resNumCols;
+        mlir::Value one = builder.create<ConstantOp>(loc, double(1));
+        mlir::Value minusOne = builder.create<ConstantOp>(loc, int64_t(-1));
+        switch(numArgs) {
+            case 2: { // none are given, all default
+                weight = one;
+                resNumRows = minusOne;
+                resNumCols = minusOne;
+                break;
+            }
+            case 3: { // weight is given; resNumRows and resNumCols default to -1 (unknown)
+                weight = args[2];
+                resNumRows = minusOne;
+                resNumCols = minusOne;
+                break;
+            }
+            case 4: { // resNumRows, resNumCols are given; weight defaults to 1.0
+                weight = one;
+                resNumRows = utils.castSI64If(args[2]);
+                resNumCols = utils.castSI64If(args[3]);
+                break;
+            }
+            case 5: { // weight, resNumRows, resNumCols are given
+                weight = args[2];
+                resNumRows = utils.castSI64If(args[3]);
+                resNumCols = utils.castSI64If(args[4]);
+                break;
+            }
+            default:
+                throw std::runtime_error("ctable(): unexpected number of arguments");
+        }
+        return static_cast<mlir::Value>(builder.create<CTableOp>(
+                loc, utils.unknownType, lhs, rhs, weight, resNumRows, resNumCols
         ));
     }
     if(func == "syrk") {
@@ -735,45 +833,36 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
 
     if(func == "sql") {
         checkNumArgsExact(func, numArgs, 1);
-        if(auto co = args[0].getDefiningOp<mlir::daphne::ConstantOp>()) {
-            mlir::Attribute attr = co.value();
-            if(attr.isa<mlir::StringAttr>()) {
-                // TODO How to know the column types, or how to not need to
-                // know them here? For now, we just leave them blank here.
-                std::vector<mlir::Type> colTypes;
-                // TODO Don't hardcode the column types. Since we cannot know
-                // them at this point, we should enable some way to leave them
-                // unknown.
-                colTypes.push_back(builder.getF64Type());
-                co.erase();
-                return static_cast<mlir::Value>(builder.create<SqlOp>(
-                        loc,
-                        FrameType::get(builder.getContext(), colTypes),
-                        attr.dyn_cast<mlir::StringAttr>()
-                ));
-            }
-        }
-        throw std::runtime_error("SqlOp requires a SQL query as a constant string");
+
+        std::string sql = CompilerUtils::constantOrThrow<std::string>(
+                args[0], "SqlOp requires a SQL query as a constant string"
+        );
+
+        // TODO How to know the column types, or how to not need to
+        // know them here? For now, we just leave them blank here.
+        std::vector<mlir::Type> colTypes;
+        // TODO Don't hardcode the column types. Since we cannot know
+        // them at this point, we should enable some way to leave them
+        // unknown.
+        colTypes.push_back(builder.getF64Type());
+        return static_cast<mlir::Value>(builder.create<SqlOp>(
+                loc,
+                FrameType::get(builder.getContext(), colTypes),
+                builder.getStringAttr(sql)
+        ));
     }
     if(func == "registerView") {
         checkNumArgsExact(func, numArgs, 2);
-        auto co = args[0].getDefiningOp<mlir::daphne::ConstantOp>();
-        mlir::Attribute attr = co.value();
-        mlir::Value view = args[1];
-        if(attr.isa<mlir::StringAttr>()) {
-            co.erase();
-            return builder.create<RegisterViewOp>(
-                    loc,
-                    attr.dyn_cast<mlir::StringAttr>(),
-                    view
-            );
-        }
 
-        throw std::runtime_error(
-                "registerView requires a view name as a constant string, and "
-                "a frame that gets assigned to that name"
+        std::string viewName = CompilerUtils::constantOrThrow<std::string>(
+                args[0], "registerView requires a view name as a constant string"
         );
-
+        mlir::Value view = args[1];
+        return builder.create<RegisterViewOp>(
+                loc,
+                builder.getStringAttr(viewName),
+                view
+        );
     }
 
     // --------------------------------------------------------------------
@@ -911,10 +1000,10 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         checkNumArgsBetween(func, numArgs, 1, 3);
         mlir::Value arg = args[0];
         mlir::Value newline = (numArgs < 2)
-                ? builder.create<ConstantOp>(loc, builder.getBoolAttr(true))
+                ? builder.create<ConstantOp>(loc, true)
                 : utils.castBoolIf(args[1]);
         mlir::Value err = (numArgs < 3)
-                ? builder.create<ConstantOp>(loc, builder.getBoolAttr(false))
+                ? builder.create<ConstantOp>(loc, false)
                 : utils.castBoolIf(args[2]);
         return builder.create<PrintOp>(
                 loc, arg, newline, err
@@ -969,6 +1058,50 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         mlir::Value filename = args[1];
         return builder.create<WriteOp>(loc, arg, filename);
     }
+    if(func == "receiveFromNumpy") {
+        checkNumArgsExact(func, numArgs, 5);
+        
+        mlir::Value upper = utils.castUI32If(args[0]);
+        mlir::Value lower = utils.castUI32If(args[1]);
+        mlir::Value rows = args[2];
+        mlir::Value cols = args[3];
+        mlir::Value valueType = args[4];
+
+        int64_t valueTypeCode = CompilerUtils::constantOrThrow<int64_t>(
+                valueType, "the value type code in ReceiveFromNumpyOp must be a constant"
+        );
+
+        // TODO Is there a utility for this mapping from value type code to MLIR type?
+        mlir::Type vt;
+        if(valueTypeCode == (int64_t)ValueTypeCode::F32)
+            vt = builder.getF32Type();
+        else if(valueTypeCode == (int64_t)ValueTypeCode::F64)
+            vt = builder.getF64Type();
+        else if(valueTypeCode == (int64_t)ValueTypeCode::SI8)
+            vt = builder.getIntegerType(8, true);
+        else if(valueTypeCode == (int64_t)ValueTypeCode::SI32)
+            vt = builder.getIntegerType(32, true);
+        else if(valueTypeCode == (int64_t)ValueTypeCode::SI64)
+            vt = builder.getIntegerType(64, true);
+        else if(valueTypeCode == (int64_t)ValueTypeCode::UI8)
+            vt = builder.getIntegerType(8, false);
+        else if(valueTypeCode == (int64_t)ValueTypeCode::UI32)
+            vt = builder.getIntegerType(32, false);
+        else if(valueTypeCode == (int64_t)ValueTypeCode::UI64)
+            vt = builder.getIntegerType(64, false);
+        else
+            throw std::runtime_error("invalid value type code");
+
+        return static_cast<mlir::Value>(builder.create<ReceiveFromNumpyOp>(
+                loc, utils.matrixOf(vt), upper, lower, rows, cols
+        ));
+    }
+    if(func == "saveDaphneLibResult") {
+        checkNumArgsExact(func, numArgs, 1);
+        mlir::Value arg = args[0];
+        return builder.create<SaveDaphneLibResultOp>(loc, arg);
+    }
+
     // --------------------------------------------------------------------
     // Low-level
     // --------------------------------------------------------------------
@@ -1041,6 +1174,24 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
                 loc, builder.getIntegerType(64, true)
         ));
     }
+
+    // ****************************************************************************
+    // Higher-order operations
+    // ****************************************************************************
+
+    if(func == "map") {
+        checkNumArgsExact(func, numArgs, 2);
+        mlir::Value source = args[0];
+
+        auto co = args[1].getDefiningOp<mlir::daphne::ConstantOp>();
+        mlir::Attribute attr = co.getValue();
+
+        return static_cast<mlir::Value>(builder.create<MapOp>(
+            loc, source.getType(), source, attr.dyn_cast<mlir::StringAttr>()
+        ));
+
+    }
+
 
     // ********************************************************************
 

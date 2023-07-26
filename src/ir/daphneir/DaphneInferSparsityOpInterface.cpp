@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
 
 #include <mlir/IR/Value.h>
@@ -44,21 +45,12 @@ double getSparsityOrUnknownFromType(Value v) {
         return -1.0;
 }
 
-double getSparsityOrUnknownFromScalar(Value v) {
-    if(!v.getDefiningOp()) // check if block argument
-        return -1.0;
-    if(auto co = llvm::dyn_cast<daphne::ConstantOp>(v.getDefiningOp()))
-        if(auto doubleAttr = co.value().dyn_cast<FloatAttr>())
-            return doubleAttr.getValue().convertToDouble();
-    return -1.0; // the value of the scalar is unknown at the moment
-}
-
 // ****************************************************************************
 // Sparsity inference interface implementations
 // ****************************************************************************
 
 std::vector<double> daphne::DiagMatrixOp::inferSparsity() {
-    auto argTy = arg().getType().dyn_cast<daphne::MatrixType>();
+    auto argTy = getArg().getType().dyn_cast<daphne::MatrixType>();
     auto k = argTy.getNumRows();
     auto sparsity = argTy.getSparsity();
 
@@ -70,8 +62,8 @@ std::vector<double> daphne::DiagMatrixOp::inferSparsity() {
 }
 
 std::vector<double> daphne::MatMulOp::inferSparsity() {
-    auto lhsTy = lhs().getType().dyn_cast<daphne::MatrixType>();
-    auto rhsTy = rhs().getType().dyn_cast<daphne::MatrixType>();
+    auto lhsTy = getLhs().getType().dyn_cast<daphne::MatrixType>();
+    auto rhsTy = getRhs().getType().dyn_cast<daphne::MatrixType>();
     if(lhsTy.getSparsity() == -1.0 || rhsTy.getSparsity() == -1.0) {
         return {-1.0};
     }
@@ -87,7 +79,7 @@ std::vector<double> daphne::MatMulOp::inferSparsity() {
 }
 
 std::vector<double> daphne::TriOp::inferSparsity() {
-    auto argTy = arg().getType().dyn_cast<daphne::MatrixType>();
+    auto argTy = getArg().getType().dyn_cast<daphne::MatrixType>();
     if(argTy.getSparsity() == -1.0) {
         return {-1.0};
     }
@@ -96,19 +88,16 @@ std::vector<double> daphne::TriOp::inferSparsity() {
 }
 
 std::vector<double> daphne::ReadOp::inferSparsity() {
-    // TODO Use CompilerUtils::getFileMetaData() here, but it throws if the
-    // file name is not a constant (after constant propagation).
-    if(auto co = llvm::dyn_cast<mlir::daphne::ConstantOp>(fileName().getDefiningOp())) {
-        if(auto strAttr = co.value().dyn_cast<mlir::StringAttr>()) {
-            auto filename = strAttr.getValue().str();
-            FileMetaData fmd = MetaDataParser::readMetaData(filename);
-            if (fmd.numNonZeros == -1)
-                return {-1.0};
-            // TODO: maybe use type shape info instead of file? (would require correct order of optimization passes)
-            return {(static_cast<double>(fmd.numNonZeros) / fmd.numRows) / fmd.numCols};
-        }
+    std::pair<bool, std::string> p = CompilerUtils::isConstant<std::string>(getFileName());
+    if(p.first) {
+        FileMetaData fmd = MetaDataParser::readMetaData(p.second);
+        if (fmd.numNonZeros == -1)
+            return {-1.0};
+        // TODO: maybe use type shape info instead of file? (would require correct order of optimization passes)
+        return {(static_cast<double>(fmd.numNonZeros) / fmd.numRows) / fmd.numCols};
     }
-    return {-1.0};
+    else
+        return {-1.0};
 }
 
 // ****************************************************************************
@@ -139,7 +128,7 @@ template<size_t i>
 struct trySparsityFromIthScalar {
     static void apply(double &sparsity, Operation *op) {
         if(op->hasTrait<SparsityFromIthScalar<i>::template Impl>())
-            sparsity = getSparsityOrUnknownFromScalar(op->getOperand(i));
+            sparsity = CompilerUtils::constantOrDefault<double>(op->getOperand(i), -1);
     }
 };
 

@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#include <compiler/CompilerUtils.h>
+#include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
+#include <runtime/local/datastructures/Structure.h>
 
 #include <mlir/IR/Value.h>
 
@@ -45,44 +46,11 @@ std::pair<ssize_t, ssize_t> getShape(Value v) {
         return std::make_pair(1, 1);
 }
 
-ssize_t getSizeOrUnknown(Value v) {
-    if (!v.getDefiningOp()) // check if block argument
-        return -1;
-    if(auto co = llvm::dyn_cast<daphne::ConstantOp>(v.getDefiningOp()))
-        if(auto intAttr = co.value().dyn_cast<IntegerAttr>())
-            return intAttr.getValue().getLimitedValue();
-    return -1; // the value of the scalar is unknown at the moment
-}
-
-// TODO This is just a quick and dirty workaround. Make this a central utility.
-int64_t getConstantInt(Value v) {
-    if(auto co = llvm::dyn_cast<daphne::ConstantOp>(v.getDefiningOp()))
-        if(auto intAttr = co.value().dyn_cast<IntegerAttr>())
-            return intAttr.getValue().getLimitedValue();
-    throw std::runtime_error("expected an integer constant");
-}
-
-// TODO This is just a quick and dirty workaround. Make this a central utility.
-double getConstantDouble(Value v) {
-    if(auto co = llvm::dyn_cast<daphne::ConstantOp>(v.getDefiningOp()))
-        if(auto floatAttr = co.value().dyn_cast<FloatAttr>())
-            return floatAttr.getValue().convertToDouble();
-    throw std::runtime_error("expected a floating-point constant");
-}
-
-// TODO This is just a quick and dirty workaround. Make this a central utility.
-float getConstantFloat(Value v) {
-    if(auto co = llvm::dyn_cast<daphne::ConstantOp>(v.getDefiningOp()))
-        if(auto floatAttr = co.value().dyn_cast<FloatAttr>())
-            return floatAttr.getValue().convertToFloat();
-    throw std::runtime_error("expected a floating-point constant");
-}
-
 ssize_t inferNumRowsFromArgs(ValueRange vs) {
     // If the #rows of all arguments is known and matches, then this is the
-    // infered #rows. If the known #rows of any two arguments mismatch, an
+    // inferred #rows. If the known #rows of any two arguments mismatch, an
     // exception is thrown. Otherwise, if the #rows of any argument is unknown,
-    // the infered #rows is unknown.
+    // the inferred #rows is unknown.
     ssize_t numRows = getShape(vs[0]).first;
     bool someUnknown = false;
     if(numRows == -1)
@@ -157,18 +125,18 @@ ssize_t inferNumColsFromSumOfArgs(ValueRange vs) {
 // ****************************************************************************
 
 ssize_t daphne::CartesianOp::inferNumRows() {
-    auto ftLhs = lhs().getType().dyn_cast<daphne::FrameType>();
-    auto ftRhs = rhs().getType().dyn_cast<daphne::FrameType>();
+    auto ftLhs = getLhs().getType().dyn_cast<daphne::FrameType>();
+    auto ftRhs = getRhs().getType().dyn_cast<daphne::FrameType>();
     return ftLhs.getNumRows() * ftRhs.getNumRows();
 }
 
 ssize_t daphne::SeqOp::inferNumRows() {
-    Type fromTy = from().getType();
+    Type fromTy = getFrom().getType();
     if(fromTy.isF64()) {
         try {
-            double vFrom = getConstantDouble(from());
-            double vTo = getConstantDouble(to());
-            double vInc = getConstantDouble(inc());
+            double vFrom = CompilerUtils::constantOrThrow<double>(getFrom());
+            double vTo = CompilerUtils::constantOrThrow<double>(getTo());
+            double vInc = CompilerUtils::constantOrThrow<double>(getInc());
             return floor(vTo / vInc - vFrom / vInc) + 1;
         }
         catch(const std::runtime_error & e) {
@@ -177,9 +145,9 @@ ssize_t daphne::SeqOp::inferNumRows() {
     }
     if(fromTy.isF32()) {
         try {
-            float vFrom = getConstantFloat(from());
-            float vTo = getConstantFloat(to());
-            float vInc = getConstantFloat(inc());
+            float vFrom = CompilerUtils::constantOrThrow<float>(getFrom());
+            float vTo = CompilerUtils::constantOrThrow<float>(getTo());
+            float vInc = CompilerUtils::constantOrThrow<float>(getInc());
             return floor(vTo / vInc - vFrom / vInc) + 1;
         }
         catch(const std::runtime_error & e) {
@@ -188,9 +156,9 @@ ssize_t daphne::SeqOp::inferNumRows() {
     }
     else if(fromTy.isSignedInteger(64)) {
         try {
-            int64_t vFrom = getConstantInt(from());
-            int64_t vTo = getConstantInt(to());
-            int64_t vInc = getConstantInt(inc());
+            int64_t vFrom = CompilerUtils::constantOrThrow<int64_t>(getFrom());
+            int64_t vTo = CompilerUtils::constantOrThrow<int64_t>(getTo());
+            int64_t vInc = CompilerUtils::constantOrThrow<int64_t>(getInc());
             return abs(vTo - vFrom) / abs(vInc) + 1;
         }
         catch(const std::runtime_error & e) {
@@ -204,7 +172,7 @@ ssize_t daphne::SeqOp::inferNumRows() {
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::CreateFrameOp::inferShape() {
-    return {{inferNumRowsFromArgs(cols()), inferNumColsFromSumOfArgs(cols())}};
+    return {{inferNumRowsFromArgs(getCols()), inferNumColsFromSumOfArgs(getCols())}};
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupJoinOp::inferShape() {
@@ -216,40 +184,37 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupJoinOp::inferShape() {
 std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupOp::inferShape() {
     // We don't know the exact number of groups here.
     const size_t numRows = -1;
-    const size_t numCols = inferNumColsFromArgs(keyCol()) + inferNumColsFromArgs(aggCol());
+    const size_t numCols = getKeyCol().size() + getAggCol().size();
     return {{numRows, numCols}};
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::MatMulOp::inferShape() {
-    auto shapeLhs = getShape(lhs());
-    auto shapeRhs = getShape(rhs());
+    auto shapeLhs = getShape(getLhs());
+    auto shapeRhs = getShape(getRhs());
 
     ssize_t numRows = -1;
-    if(auto co = transa().getDefiningOp<mlir::daphne::ConstantOp>()) {
-        bool ta = co.value().dyn_cast<mlir::BoolAttr>().getValue();
-        numRows = ta ? shapeLhs.second : shapeLhs.first;
-    }
+    std::pair<bool, bool> pr = CompilerUtils::isConstant<bool>(getTransa());
+    if(pr.first)
+        numRows = pr.second ? shapeLhs.second : shapeLhs.first;
     
     ssize_t numCols = -1;
-    if(auto co = transb().getDefiningOp<mlir::daphne::ConstantOp>()) {
-        bool tb = co.value().dyn_cast<mlir::BoolAttr>().getValue();
-        numCols = tb ? shapeRhs.first : shapeRhs.second;
-    }
+    std::pair<bool, bool> pc = CompilerUtils::isConstant<bool>(getTransb());
+    if(pc.first)
+        numCols = pc.second ? shapeRhs.first : shapeRhs.second;
 
     return {{numRows, numCols}};
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::ReadOp::inferShape() {
-    FileMetaData fmd = CompilerUtils::getFileMetaData(fileName());
+    FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
     return {{fmd.numRows, fmd.numCols}};
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::OrderOp::inferShape() {
     size_t numRows = -1;
     size_t numCols = -1;
-    bool idxs = false;
 
-    Type t = arg().getType();
+    Type t = getArg().getType();
     if(auto mt = t.dyn_cast<daphne::MatrixType>()){
         numRows = mt.getNumRows();
         numCols = mt.getNumCols();
@@ -258,11 +223,188 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::OrderOp::inferShape() {
         numRows = ft.getNumRows();
         numCols = ft.getNumCols();
     }
-    if(auto co = returnIdxs().getDefiningOp<mlir::daphne::ConstantOp>()) 
-        idxs = co.value().dyn_cast<mlir::BoolAttr>().getValue();
-    if (idxs)
-        numCols = 1;
+    std::pair<bool, bool> p = CompilerUtils::isConstant<bool>(getReturnIdxs());
+    if(p.first) {
+        if(p.second)
+            numCols = 1;
+    }
+    else
+        numCols = -1;
+
     return {{numRows, numCols}};
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::CondOp::inferShape() {
+    Type condTy = getCond().getType();
+    if(condTy.isa<daphne::UnknownType>())
+        // Actually, this should not happen, because if the type of the
+        // condition is unknown, the type of the result should be unknown
+        // too per type inference, such that shape inference should not
+        // even get called. Nevertheless, returning unknown will probably
+        // not hurt in case anyone ever calls this from somewhere else.
+        return {{-1, -1}};
+    if(auto condMatTy = condTy.dyn_cast<daphne::MatrixType>())
+        return {{condMatTy.getNumRows(), condMatTy.getNumCols()}};
+    else if(auto condFrmTy = condTy.dyn_cast<daphne::FrameType>())
+        throw std::runtime_error("CondOp does not support frames for the condition yet");
+    else { // cond is a scalar // TODO check if it is really a scalar
+        Type thenTy = getThenVal().getType();
+        Type elseTy = getElseVal().getType();
+        
+        ssize_t thenNumRows = -1;
+        ssize_t thenNumCols = -1;
+        ssize_t elseNumRows = -1;
+        ssize_t elseNumCols = -1;
+        auto thenMatTy = thenTy.dyn_cast<daphne::MatrixType>();
+        auto thenFrmTy = thenTy.dyn_cast<daphne::FrameType>();
+        auto elseMatTy = elseTy.dyn_cast<daphne::MatrixType>();
+        auto elseFrmTy = elseTy.dyn_cast<daphne::FrameType>();
+        if(thenMatTy) {
+            thenNumRows = thenMatTy.getNumRows();
+            thenNumCols = thenMatTy.getNumCols();
+        }
+        else if(thenFrmTy) {
+            thenNumRows = thenFrmTy.getNumRows();
+            thenNumCols = thenFrmTy.getNumCols();
+        }
+        if(elseMatTy) {
+            elseNumRows = elseMatTy.getNumRows();
+            elseNumCols = elseMatTy.getNumCols();
+        }
+        else if(elseFrmTy) {
+            elseNumRows = elseFrmTy.getNumRows();
+            elseNumCols = elseFrmTy.getNumCols();
+        }
+
+        if((thenMatTy || thenFrmTy) && (elseMatTy || elseFrmTy))
+            return {{
+                (thenNumRows == elseNumRows) ? thenNumRows : -1,
+                (thenNumCols == elseNumCols) ? thenNumCols : -1
+            }};
+        else
+            // Then-value or else-value is a scalar.
+            return {{-1, -1}};
+    }
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::CTableOp::inferShape() {
+    // If the result shape is given as arguments, then we know it.
+    // Otherwise, we don't.
+    // TODO In case resNumRows/resNumCols are known to be -1 (i.e., if
+    // the output shape shall be determined depending on the values in
+    // the lhs and rhs input matrices) and the lhs/rhs input matrices
+    // are compile-time constants, then we could determine the number
+    // of rows/columns here.
+    return {{
+        CompilerUtils::constantOrDefault<ssize_t>(getResNumRows(), -1),
+        CompilerUtils::constantOrDefault<ssize_t>(getResNumCols(), -1)
+    }};
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::MatrixConstantOp::inferShape() {
+    const Structure* mat = reinterpret_cast<const Structure*>(CompilerUtils::constantOrThrow<uint64_t>(getMatrixAddr()));
+    return {{mat->getNumRows(), mat->getNumCols()}};
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceRowOp::inferShape() {
+    Type srcTy = getSource().getType();
+    ssize_t srcNumRows;
+    ssize_t srcNumCols;
+    if(auto srcMatTy = srcTy.dyn_cast<daphne::MatrixType>()) {
+        srcNumRows = srcMatTy.getNumRows();
+        srcNumCols = srcMatTy.getNumCols();
+    }
+    else if(auto srcFrmTy = srcTy.dyn_cast<daphne::FrameType>()) {
+        srcNumRows = srcFrmTy.getNumRows();
+        srcNumCols = srcFrmTy.getNumCols();
+    }
+    else
+        // If this is the case, shape inference shouldn't have been called.
+        throw std::runtime_error(
+                "SliceRowOp shape inference does only support matrix and frame inputs"
+        );
+    
+    auto loIn = CompilerUtils::isConstant<int64_t>(getLowerIncl());
+    auto upEx = CompilerUtils::isConstant<int64_t>(getUpperExcl());
+
+    ssize_t resNumRows = -1;
+    if(srcNumRows != -1 && loIn.first && upEx.first) {
+        ssize_t loInPos = loIn.second;
+        ssize_t upExPos = upEx.second;
+        if(loInPos < 0 || loInPos >= srcNumRows)
+            throw std::runtime_error(
+                "SliceRowOp shape inference: lowerIncl must be in [0, numRows), "
+                "but is " + std::to_string(loInPos) +
+                " with " + std::to_string(srcNumRows) + " rows"
+            );
+        if(upExPos < 0 || upExPos > srcNumRows)
+            throw std::runtime_error(
+                "SliceRowOp shape inference: upperExcl must be in [0, numRows], "
+                "but is " + std::to_string(upExPos) +
+                " with " + std::to_string(srcNumRows) + " rows"
+            );
+        if(loInPos > upExPos)
+            throw std::runtime_error(
+                "SliceRowOp shape inference: lowerIncl must not be greater than upperExcl"
+                " (found " + std::to_string(loInPos) + " and " + std::to_string(upExPos) + ")"
+            );
+        resNumRows = upExPos - loInPos;
+    }
+
+    return {{resNumRows, srcNumCols}};
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceColOp::inferShape() {
+    Type srcTy = getSource().getType();
+    ssize_t srcNumRows;
+    ssize_t srcNumCols;
+    if(auto srcMatTy = srcTy.dyn_cast<daphne::MatrixType>()) {
+        srcNumRows = srcMatTy.getNumRows();
+        srcNumCols = srcMatTy.getNumCols();
+    }
+    else if(auto srcFrmTy = srcTy.dyn_cast<daphne::FrameType>()) {
+        srcNumRows = srcFrmTy.getNumRows();
+        srcNumCols = srcFrmTy.getNumCols();
+    }
+    else
+        // If this is the case, shape inference shouldn't have been called.
+        throw std::runtime_error(
+                "SliceColOp shape inference does only support matrix and frame inputs"
+        );
+    
+    auto loIn = CompilerUtils::isConstant<int64_t>(getLowerIncl());
+    auto upEx = CompilerUtils::isConstant<int64_t>(getUpperExcl());
+
+    ssize_t resNumCols = -1;
+    if(srcNumCols != -1 && loIn.first && upEx.first) {
+        ssize_t loInPos = loIn.second;
+        ssize_t upExPos = upEx.second;
+        if(loInPos < 0 || loInPos >= srcNumCols)
+            throw std::runtime_error(
+                "SliceColOp shape inference: lowerIncl must be in [0, numCols), "
+                "but is " + std::to_string(loInPos) +
+                " with " + std::to_string(srcNumCols) + " cols"
+            );
+        if(upExPos < 0 || upExPos > srcNumCols)
+            throw std::runtime_error(
+                "SliceColOp shape inference: upperExcl must be in [0, numCols], "
+                "but is " + std::to_string(upExPos) +
+                " with " + std::to_string(srcNumCols) + " cols"
+            );
+        if(loInPos > upExPos)
+            throw std::runtime_error(
+                "SliceColOp shape inference: lowerIncl must not be greater than upperExcl"
+                " (found " + std::to_string(loInPos) + " and " + std::to_string(upExPos) + ")"
+            );
+        resNumCols = upEx.second - loIn.second;
+    }
+
+    return {{srcNumRows, resNumCols}};
+}
+
+std::vector<std::pair<ssize_t, ssize_t>> daphne::EigenOp::inferShape() {
+    auto shape = getShape(getOperand());
+    return {{shape.first, 1}, {shape.first, shape.first}};
 }
 
 // ****************************************************************************
@@ -291,14 +433,14 @@ template<size_t i>
 struct tryNumRowsFromIthScalar {
     static void apply(ssize_t& numRows, ssize_t& numCols, Operation* op) {
         if(op->hasTrait<NumRowsFromIthScalar<i>::template Impl>())
-            numRows = getSizeOrUnknown(op->getOperand(i));
+            numRows = CompilerUtils::constantOrDefault<int64_t>(op->getOperand(i), -1);
     }
 };
 template<size_t i>
 struct tryNumColsFromIthScalar {
     static void apply(ssize_t& numRows, ssize_t& numCols, Operation* op) {
         if(op->hasTrait<NumColsFromIthScalar<i>::template Impl>())
-            numCols = getSizeOrUnknown(op->getOperand(i));
+            numCols = CompilerUtils::constantOrDefault<int64_t>(op->getOperand(i), -1);
     }
 };
 

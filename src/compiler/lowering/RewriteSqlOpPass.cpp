@@ -18,9 +18,9 @@
 #include "ir/daphneir/Daphne.h"
 #include "ir/daphneir/Passes.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include <memory>
@@ -50,8 +50,8 @@ namespace
         {
             if(auto rOp = llvm::dyn_cast<mlir::daphne::RegisterViewOp>(op)){
                 std::stringstream view_stream;
-                view_stream << rOp.view().str();
-                mlir::Value arg = rOp.arg();
+                view_stream << rOp.getView().str();
+                mlir::Value arg = rOp.getArg();
 
                 tables[view_stream.str()] = arg;
                 rewriter.eraseOp(op);
@@ -60,16 +60,24 @@ namespace
 
 #ifndef USE_MORPHSTORE
                 std::stringstream sql_query;
-                sql_query << sqlop.sql().str();
+                sql_query << sqlop.getSql().str();
 
                 SQLParser parser;
                 parser.setView(tables);
                 std::string sourceName;
                 llvm::raw_string_ostream ss(sourceName);
                 ss << "[sql query @ " << sqlop->getLoc() << ']';
-                mlir::Value result_op = parser.parseStreamFrame(rewriter, sql_query, sourceName);
-
+                mlir::Value result_op;
+                try {
+                    result_op = parser.parseStreamFrame(rewriter, sql_query, sourceName);
+                }
+                catch (std::runtime_error& re) {
+                    spdlog::error("Final catch std::runtime_error in {}:{}: \n{}",__FILE__, __LINE__, re.what());
+                    return failure();
+                }
                 rewriter.replaceOp(op, result_op);
+                // TODO Why is this necessary when we have already replaced the op?
+                rewriter.replaceAllUsesWith(op->getResult(0), result_op);
                 return success();
 #else
                 std::stringstream sql_query;
@@ -101,13 +109,13 @@ void RewriteSqlOpPass::runOnOperation()
 {
     auto module = getOperation();
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     ConversionTarget target(getContext());
-    target.addLegalDialect<StandardOpsDialect, LLVM::LLVMDialect, scf::SCFDialect, daphne::DaphneDialect>();
-    target.addLegalOp<ModuleOp, FuncOp>();
+    target.addLegalDialect<arith::ArithDialect, LLVM::LLVMDialect, scf::SCFDialect, daphne::DaphneDialect>();
+    target.addLegalOp<ModuleOp, func::FuncOp>();
     target.addIllegalOp<mlir::daphne::SqlOp, mlir::daphne::RegisterViewOp>();
 
-    patterns.insert<SqlReplacement>(&getContext());
+    patterns.add<SqlReplacement>(&getContext());
 
     if (failed(applyPartialConversion(module, target, std::move(patterns))))
         signalPassFailure();

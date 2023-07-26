@@ -93,7 +93,7 @@ expr:
     | lhs=expr op=('=='|'!='|'<'|'<='|'>'|'>=') rhs=expr # cmpExpr
     | lhs=expr op='&&' rhs=expr # conjExpr
     | lhs=expr op='||' rhs=expr # disjExpr
-    | cond=expr '?' thenExpr=expr ':' elseExpr=expr # ternExpr
+    | cond=expr '?' thenExpr=expr ':' elseExpr=expr # condExpr
     | '[' (literal (',' literal)*)? ']' # matrixLiteralExpr
     ;
 
@@ -147,7 +147,7 @@ VALUE_TYPE:
         'f64' | 'f32' |
         'si64' | 'si32' | 'si8' |
         'ui64' | 'ui32' | 'ui8' |
-        'str'
+        'str' | 'bool'
     ) ;
 
 INT_LITERAL:

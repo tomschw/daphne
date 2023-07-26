@@ -184,6 +184,7 @@ public:
         if(name == "ui32") return builder.getIntegerType(32, false);
         if(name == "ui8") return builder.getIntegerType(8, false);
         if(name == "str") return strType;
+        if(name == "bool") return boolType;
         throw std::runtime_error("unsupported value type: " + name);
     }
 
@@ -223,7 +224,7 @@ public:
      * @return mlir location representing the position of the token in the file
      */
     mlir::Location getLoc(antlr4::Token *start) {
-        return mlir::FileLineColLoc::get(builder.getIdentifier(start->getTokenSource()->getSourceName()),
+        return mlir::FileLineColLoc::get(builder.getStringAttr(start->getTokenSource()->getSourceName()),
             start->getLine(),
             start->getCharPositionInLine());
     }

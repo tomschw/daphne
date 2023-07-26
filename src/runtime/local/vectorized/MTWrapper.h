@@ -26,6 +26,8 @@
 #include <runtime/local/vectorized/WorkerCPU.h>
 #include <runtime/local/vectorized/WorkerGPU.h>
 
+#include <spdlog/spdlog.h>
+
 #include <fstream>
 #include <functional>
 #include <queue>
@@ -81,6 +83,7 @@ protected:
         return false;
     }
 
+    // FIXME: This method is not working on ARM - see GitHub issue [DAPHNE-#554]
     void get_topology(std::vector<int> &physicalIds, std::vector<int> &uniqueThreads, std::vector<int> &responsibleThreads) {
         std::ifstream cpuinfoFile(_cpuinfoPath);
         std::vector<int> utilizedThreads;
@@ -168,7 +171,7 @@ protected:
             if((*res[i]) == nullptr && outRows[i] != -1 && outCols[i] != -1) {
                 auto zeroOut = combines[i] == mlir::daphne::VectorCombine::ADD;
                 (*res[i]) = DataObjectFactory::create<DT>(outRows[i], outCols[i], zeroOut);
-                mem_required += static_cast<DT*>((*res[i]))->bufferSize();
+                mem_required += static_cast<DT*>((*res[i]))->getBufferSize();
             }
         }
         return mem_required;
@@ -186,7 +189,19 @@ protected:
 
 public:
     explicit MTWrapperBase(uint32_t numFunctions, DCTX(ctx)) : _ctx(ctx) {
+        // ToDo: this is a workaround until getTopology() is properly fixed via hwloc library calls (see issue [DAPHNE-#554])
+#ifdef __x86_64__
+        spdlog::debug("Querying x86-64 cpu topology");
         get_topology(topologyPhysicalIds, topologyUniqueThreads, topologyResponsibleThreads);
+#else
+        spdlog::debug("Querying arm cpu topology");
+        _numCPPThreads = std::thread::hardware_concurrency();
+        for (auto i = 0; i < static_cast<int>(_numCPPThreads); i++) {
+            topologyPhysicalIds.push_back(i);
+            topologyUniqueThreads.push_back(i);
+            topologyResponsibleThreads.push_back(i);
+        }
+#endif
         if(ctx->config.numberOfThreads > 0)
             _numCPPThreads = ctx->config.numberOfThreads;
         else
@@ -236,10 +251,8 @@ public:
             std::cout << std::endl << "_totalNumaDomains=" << _totalNumaDomains << std::endl;
             std::cout << "_numQueues=" << _numQueues << std::endl;
         }
-#ifndef NDEBUG
-        std::cerr << "spawning " << this->_numCPPThreads << " CPU and " << this->_numCUDAThreads << " CUDA worker threads"
-                  << std::endl;
-#endif
+
+        spdlog::debug("spawning {} CPU and {} CUDA worker threads", this->_numCPPThreads, this->_numCUDAThreads);
     }
 
     virtual ~MTWrapperBase() = default;

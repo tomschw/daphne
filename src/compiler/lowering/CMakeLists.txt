@@ -19,8 +19,10 @@ add_mlir_dialect_library(MLIRDaphneTransforms
     MarkCUDAOpsPass.cpp
     MarkFPGAOPENCLOpsPass.cpp
     InsertDaphneContextPass.cpp
+    ProfilingPass.cpp
     ManageObjRefsPass.cpp
     LowerToLLVMPass.cpp
+    PhyOperatorSelectionPass.cpp
     RewriteToCallKernelOpPass.cpp
     SpecializeGenericFunctionsPass.cpp
     VectorizeComputationsPass.cpp
@@ -34,7 +36,11 @@ add_mlir_dialect_library(MLIRDaphneTransforms
     Core
 )
 target_link_libraries(MLIRDaphneTransforms PUBLIC
-    MLIRStandardToLLVM
+    CompilerUtils
+    MLIRArithToLLVM
+    MLIRControlFlowToLLVM
+    MLIRFuncToLLVM
+    MLIRFuncTransforms
     SQLParser
 )
 

@@ -18,6 +18,7 @@
 #include <ir/daphneir/Daphne.h>
 #include <parser/sql/SQLVisitor.h>
 #include "antlr4-runtime.h"
+#include "mlir/IR/OpDefinition.h"
 
 #include <stdexcept>
 #include <string>
@@ -181,8 +182,7 @@ mlir::Value SQLVisitor::castToMatrixColumn(mlir::Value toCast){
 
         mlir::Value one = static_cast<mlir::Value>(
             builder.create<mlir::daphne::ConstantOp>(
-                loc,
-                builder.getIntegerAttr(builder.getIntegerType(64, true), 1)
+                loc, static_cast<int64_t>(1)
             ));
 
         return static_cast<mlir::Value>(
@@ -203,7 +203,7 @@ mlir::Value SQLVisitor::castToIntMatrixColumn(mlir::Value toCast){
     mlir::Type resType = utils.matrixOf(vt);
 
     if(toCastMatrix.getType() != resType){
-        mlir::Value toCastFrame = matrixToFrame(toCastMatrix, "meh"); // We need this step because castOp can't cast a matrix to a matrix
+        mlir::Value toCastFrame = matrixToFrame(toCastMatrix, "TempCol"); // We need this step because castOp can't cast a matrix to a matrix
 
         return static_cast<mlir::Value>(builder.create<mlir::daphne::CastOp>(
                 loc, resType, toCastFrame
@@ -811,8 +811,7 @@ antlrcpp::Any SQLVisitor::visitOrderByClause(
     }
     mlir::Value returnFrame = static_cast<mlir::Value>(
             builder.create<mlir::daphne::ConstantOp>(
-                    loc,
-                    builder.getBoolAttr(false)
+                    loc, false
             )
         );
     return static_cast<mlir::Value>(
@@ -836,15 +835,13 @@ antlrcpp::Any SQLVisitor::visitOrderInformation(
     if(ctx->desc){
         return static_cast<mlir::Value>(
             builder.create<mlir::daphne::ConstantOp>(
-                    loc,
-                    builder.getBoolAttr(false)
+                    loc, false
             )
         );
     }
     return static_cast<mlir::Value>(
         builder.create<mlir::daphne::ConstantOp>(
-                loc,
-                builder.getBoolAttr(true)
+                loc, true
         )
     );
 }
@@ -906,8 +903,70 @@ antlrcpp::Any SQLVisitor::visitGroupAggExpr(
     //  the currentFrame. This Matrix is the result of this function.
     std::string newColumnName = "group_" + ctx->var->getText();
 
-    if(!isBitSet(sqlFlag, (int64_t)SQLBit::group)){  //Not allowed Function Call
-        throw std::runtime_error("Use of an aggregation function without a group clause");
+    // Run aggreagation for whole column
+    if(!isBitSet(sqlFlag, (int64_t)SQLBit::group) && isBitSet(sqlFlag, (int64_t)SQLBit::codegen)){  
+        mlir::Location loc = utils.getLoc(ctx->start);
+
+        mlir::Value col = utils.valueOrError(visit(ctx->var));
+
+        mlir::Type resTypeCol = col.getType().dyn_cast<mlir::daphne::MatrixType>().getElementType();
+
+        const std::string &func = ctx->func->getText();
+
+        mlir::Value result; 
+        if(func == "count"){
+            result = utils.castSI64If(static_cast<mlir::Value>(
+            builder.create<mlir::daphne::NumRowsOp>(
+                loc,
+                utils.sizeType,
+                col
+            )));
+        }
+        if(func == "sum"){
+            result = static_cast<mlir::Value>(
+            builder.create<mlir::daphne::AllAggSumOp>(
+                loc,
+                resTypeCol,
+                col
+                )
+            );
+        }
+        if(func == "min"){
+            result = static_cast<mlir::Value>(
+            builder.create<mlir::daphne::AllAggMinOp>(
+                loc,
+                resTypeCol,
+                col
+                ) 
+            );
+        }
+        if(func == "max"){
+            result = static_cast<mlir::Value>(
+            builder.create<mlir::daphne::AllAggMaxOp>(
+                loc,
+                resTypeCol,
+                col
+                )
+            );
+        }
+        if(func == "avg"){
+            result = static_cast<mlir::Value>(
+            builder.create<mlir::daphne::AllAggMeanOp>(
+                loc,
+                resTypeCol,
+                col
+                )
+            );
+        }
+
+        std::string newColumnNameAppended = getEnumLabelExt(ctx->func->getText()) + "(" + newColumnName + ")";
+
+        return utils.castIf(utils.matrixOf(result), result);
+
+        std::stringstream x;
+        x << "Error: " << func << " does not name a supported aggregation function";
+        throw std::runtime_error(x.str());
+        
     }
     if(isBitSet(sqlFlag, (int64_t)SQLBit::agg)){ //Not allowed nested Function Call
         throw std::runtime_error("Nested Aggregation Functions");
@@ -1192,8 +1251,7 @@ antlrcpp::Any SQLVisitor::visitLiteral(
         double val = std::stod(lit->getText());
         return static_cast<mlir::Value>(
             builder.create<mlir::daphne::ConstantOp>(
-                loc,
-                builder.getF64FloatAttr(val)
+                loc, val
             )
         );
     }

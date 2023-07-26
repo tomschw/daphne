@@ -81,16 +81,24 @@ namespace
                 return success();
 #else
                 std::stringstream sql_query;
-                sql_query << sqlop.sql().str();
+                sql_query << sqlop.getSql().str();
 
                 MorphStoreSQLParser parser;
                 parser.setView(tables);
                 std::string sourceName;
                 llvm::raw_string_ostream ss(sourceName);
                 ss << "[sql query @ " << sqlop->getLoc() << ']';
-                mlir::Value result_op = parser.parseStreamFrame(rewriter, sql_query, sourceName);
+                mlir::Value result_op;
+                try {
+                    result_op = parser.parseStreamFrame(rewriter, sql_query, sourceName);
+                }
+                catch (std::runtime_error& re) {
+                    spdlog::error("Final catch std::runtime_error in {}:{}: \n{}",__FILE__, __LINE__, re.what());
+                    return failure();
+                }
 
                 rewriter.replaceOp(op, result_op);
+                rewriter.replaceAllUsesWith(op->getResult(0), result_op);
                 return success();
 #endif
             }

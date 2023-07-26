@@ -940,7 +940,8 @@ mlir::OpFoldResult mlir::daphne::EwGeOp::fold(FoldAdaptor adaptor) {
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectEqOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectEqOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a == b; };
     auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a == b; };
     // TODO: fix bool return
@@ -951,7 +952,8 @@ mlir::OpFoldResult mlir::daphne::MorphStoreSelectEqOp::fold(ArrayRef<Attribute> 
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectNeqOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectNeqOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a != b; };
     auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a != b; };
     // TODO: fix bool return
@@ -962,7 +964,8 @@ mlir::OpFoldResult mlir::daphne::MorphStoreSelectNeqOp::fold(ArrayRef<Attribute>
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectLtOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectLtOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a < b; };
     auto sintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.slt(b); };
     auto uintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.ult(b); };
@@ -980,7 +983,8 @@ mlir::OpFoldResult mlir::daphne::MorphStoreSelectLtOp::fold(ArrayRef<Attribute> 
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectLeOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectLeOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a <= b; };
     auto sintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.sle(b); };
     auto uintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.ule(b); };
@@ -998,7 +1002,8 @@ mlir::OpFoldResult mlir::daphne::MorphStoreSelectLeOp::fold(ArrayRef<Attribute> 
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectGtOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectGtOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a > b; };
     auto sintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.sgt(b); };
     auto uintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.ugt(b); };
@@ -1016,7 +1021,8 @@ mlir::OpFoldResult mlir::daphne::MorphStoreSelectGtOp::fold(ArrayRef<Attribute> 
     return {};
 }
 
-mlir::OpFoldResult mlir::daphne::MorphStoreSelectGeOp::fold(ArrayRef<Attribute> operands) {
+mlir::OpFoldResult mlir::daphne::MorphStoreSelectGeOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
     auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a >= b; };
     auto sintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.sge(b); };
     auto uintOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a.uge(b); };

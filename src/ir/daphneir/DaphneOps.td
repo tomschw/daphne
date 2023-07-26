@@ -248,13 +248,14 @@ class Daphne_EwBinaryOp<string name, Type scalarType, list<Trait> traits = []>
 // ****************************************************************************
 
 // TODO Temporarily commented, because otherwise it cannot handle UnknownType.
-class Daphne_MorphstoreBinaryOp<string name, Type scalarType, list<OpTrait> traits = []>
+class Daphne_MorphstoreBinaryOp<string name, Type scalarType, list<Trait> traits = []>
 //: Daphne_Op<name, !listconcat([TypesMatchOrOneIsMatrixOfOther<"lhs", "rhs">], traits)> {
 : Daphne_Op<name, !listconcat(traits, [
+    DataTypeFromArgs,
     DeclareOpInterfaceMethods<DistributableOpInterface>,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
-    DeclareOpInterfaceMethods<InferTypesOpInterface>,
-    ShapeEwBinary
+    ShapeEwBinary,
+    CastArgsToResType
 ])> {
     let arguments = (ins AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$lhs, AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$rhs);
     let results = (outs AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$res);
@@ -342,8 +343,8 @@ def Daphne_EwGeOp  : Daphne_EwCmpOp<"ewGe" , AnyScalar>;
 // Comparisons Morphstore
 // ----------------------------------------------------------------------------
 
-class Daphne_MorphStoreCmpOp<string name, Type inputScalarType, list<OpTrait> traits = []>
-: Daphne_EwBinaryOp<name, inputScalarType, traits> {
+class Daphne_MorphStoreCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
+: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeFromArgs])> {
 // TODO: We do not enforce (matrix of) boolean output any more, but should
 // think about that again.
 //let results = (outs AnyTypeOf<[MatrixOf<[BoolScalar]>, BoolScalar]>:$res);

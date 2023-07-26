@@ -107,8 +107,6 @@ else()
     list(APPEND LIBS LLVMSupport Util MLIRDaphneInference)
 endif()
 
-
-list(APPEND LIBS DaphneMetaDataParser MLIRDaphne MLIRDaphneTransforms)
 target_link_libraries(AllKernels PUBLIC ${LIBS})
 target_add_morphstore(AllKernels)
 

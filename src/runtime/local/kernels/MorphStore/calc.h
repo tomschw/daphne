@@ -24,7 +24,7 @@
 #include <core/storage/column.h>
 #include <core/operators/otfly_derecompr/calc_uncompr.h>
 #include "core/morphing/uncompr.h"
-
+#include <runtime/local/kernels/BinaryOpCode.h>
 
 #include <ir/daphneir/Daphne.h>
 
@@ -38,11 +38,11 @@ enum class CalcOperation : uint32_t {
 template<class DTRes, class DTIn>
 class Calc {
 public:
-    static void apply(DTRes * & res, const DTIn * inLhs, const DTIn inRhs, const char * inOnLeft, const char * inOnRight, CalcOperation calc) = delete;
+    static void apply(DTRes * & res, const DTIn * inLhs, const DTIn inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) = delete;
 };
 
 template<class DTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-void calc(DTRes * & res, const DTIn * inLhs, const DTIn * inRhs, const char * inOnLeft, const char * inOnRight, CalcOperation calc) {
+void calcBinary(DTRes * & res, const DTIn * inLhs, const DTIn * inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) {
     Calc<DTRes, DTIn>::apply(res, inLhs, inRhs, inOnLeft, inOnRight, calc);
 }
 
@@ -50,7 +50,7 @@ template<>
 class Calc<Frame, Frame> {
 public:
     template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-    static void apply(Frame * & res, const Frame * inLhs, const Frame * inRhs, const char * inOnLeft, const char * inOnRight, CalcOperation calc) {
+    static void apply(Frame * & res, const Frame * inLhs, const Frame * inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) {
         assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
 
         auto colDataLeft = static_cast<uint64_t const *>(inLhs->getColumnRaw(inLhs->getColumnIdx(inOnLeft)));
@@ -62,7 +62,7 @@ public:
         morphstore::column<morphstore::uncompr_f> *result;
 
         switch (calc) {
-            case CalcOperation::Add:
+            case BinaryOpCode::Add:
                 result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
                         morphstore::calc_binary<
                         vectorlib::add,
@@ -72,7 +72,7 @@ public:
                         morphstore::uncompr_f
                         >(opColLeft, opColRight));
                 break;
-            case CalcOperation::Sub:
+            case BinaryOpCode::Sub:
                 result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
                         morphstore::calc_binary<
                         vectorlib::sub,
@@ -82,7 +82,7 @@ public:
                         morphstore::uncompr_f
                 >(opColLeft, opColRight));
                 break;
-            case CalcOperation::Mul:
+            case BinaryOpCode::Mul:
                 result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
                         morphstore::calc_binary<
                         vectorlib::mul,
@@ -92,7 +92,7 @@ public:
                         morphstore::uncompr_f
                 >(opColLeft, opColRight));
                 break;
-            case CalcOperation::Div:
+            case BinaryOpCode::Div:
                 result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
                         morphstore::calc_binary<
                         vectorlib::div,

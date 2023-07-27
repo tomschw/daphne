@@ -24,34 +24,37 @@
 #include <core/storage/column.h>
 #include <core/operators/otfly_derecompr/agg_sum_all.h>
 #include "core/morphing/uncompr.h"
+#include <runtime/local/kernels/AggOpCode.h>
 
-template<class DTRes, class DTIn>
+template<typename VTRes, class DTIn>
 class AggSum {
 public:
-    static void apply(DTRes * & res, const DTIn * in, const char * inOn) = delete;
+    static VTRes apply(AggOpCode agg, const DTIn * in, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-void agg_sum(DTRes * & res, const DTIn * in, const char * inOn) {
-    AggSum<DTRes, DTIn>::apply(res, in, inOn);
+template<typename VTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+VTRes aggMorph(AggOpCode agg, const DTIn * in, DCTX(ctx)) {
+    return AggSum<VTRes, DTIn>::apply(agg, in, ctx);
 }
 
-template<>
-class AggSum<Frame, Frame> {
+template<typename VTRes, typename VTArg>
+class AggSum<VTRes, DenseMatrix<VTArg>> {
 public:
     template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-    static void apply(Frame * & res, const Frame * in, const char * inOn) {
-        auto colData = static_cast<uint64_t const *>(in->getColumnRaw(in->getColumnIdx(inOn)));
+    static VTRes apply(AggOpCode agg, const DenseMatrix<VTArg> * in, DCTX(ctx)) {
+        auto colData = static_cast<uint64_t const *>(in->getValues());
         const morphstore::column<morphstore::uncompr_f> * const aggCol = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * in->getNumRows(), colData);
 
-        auto* aggResult = const_cast<morphstore::column<morphstore::uncompr_f> *>(morphstore::agg_sum_all<ve, morphstore::uncompr_f, morphstore::uncompr_f>(aggCol));
-
+        morphstore::column<morphstore::uncompr_f> * aggResult = nullptr;
+        if(AggOpCode::SUM == agg) {
+            aggResult = const_cast<morphstore::column<morphstore::uncompr_f> *>(morphstore::agg_sum_all<ve, morphstore::uncompr_f, morphstore::uncompr_f>(aggCol));
+        }
         /// Change the persistence type to disable the deletion and deallocation of the data.
-        aggResult->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+        //aggResult->set_persistence_type(morphstore::storage_persistence_type::externalScope);
 
         uint64_t * ptr = aggResult->get_data();
 
-        std::shared_ptr<uint64_t[]> shrdPtr(ptr);
+        /**std::shared_ptr<uint64_t[]> shrdPtr(ptr);
 
         auto result = DataObjectFactory::create<DenseMatrix<uint64_t>>(aggResult->get_count_values(), 1, shrdPtr);
 
@@ -59,7 +62,9 @@ public:
 
         std::vector<Structure *> resultCols = {result};
 
-        res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
+        res = DataObjectFactory::create<Frame>(resultCols, columnLabels); **/
+
+        return *ptr;
 
         delete aggResult, delete aggCol;
     }

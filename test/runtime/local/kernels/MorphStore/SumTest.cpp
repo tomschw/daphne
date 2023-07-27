@@ -35,78 +35,51 @@
 TEST_CASE("Morphstore Sum: Test the operator for empty input", TAG_KERNELS) {
     /// Data generation
     auto lhs_col0 = DataObjectFactory::create<DenseMatrix<uint64_t>>(0, 1, false);
-    auto lhs_col1 = DataObjectFactory::create<DenseMatrix<uint64_t>>(0, 1, false);
-    std::vector<Structure *> lhsCols = {lhs_col0, lhs_col1};
-    std::string lhsLabels[] = {"R.idx", "R.a"};
-    auto f = DataObjectFactory::create<Frame>(lhsCols, lhsLabels);
-
-    Frame * expectedResult;
+    
+    uint64_t expectedResult;
     /// create expected result set
     {
-        std::string resultLabels[] = {"Agg_sum"};
-        size_t size = 1;
-        const std::vector<uint64_t> vals {0};
-        auto er_col0 = genGivenVals<DenseMatrix<uint64_t>>(size, vals);
+        uint64_t sum = 0;
+        for (uint64_t i = 0; i < lhs_col0->getNumRows(); ++ i) {
+            sum += lhs_col0->get(i, 0);
+        }
         /// create result data
-        expectedResult = DataObjectFactory::create<Frame>(
-                std::vector<Structure*>{er_col0},
-                resultLabels);
-        /// cleanup
-        DataObjectFactory::destroy(er_col0);
-        DataObjectFactory::destroy(lhs_col0, lhs_col1);
+        expectedResult = sum;
     }
 
-    /// test execution
-    Frame * resultFrame = nullptr;
 
-    agg_sum(resultFrame, f, "R.a");
+    uint64_t result = aggMorph<uint64_t, DenseMatrix<uint64_t>>(AggOpCode::SUM, lhs_col0, nullptr);
 
     /// test if result matches expected result
-    CHECK(*resultFrame == *expectedResult);
+    CHECK(result == expectedResult);
 
     /// cleanup
-    DataObjectFactory::destroy(resultFrame, expectedResult, f);
+    DataObjectFactory::destroy(lhs_col0);
 
 }
 
 TEST_CASE("Morphstore Sum: Test the AggSum operation", TAG_KERNELS) {
     /// Data generation
-    auto lhs_col0 = genGivenVals<DenseMatrix<uint64_t>>(10, { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9});
-    auto lhs_col1 = genGivenVals<DenseMatrix<uint64_t>>(10,  { 0, 11, 20, 33, 44, 55, 60, 77, 88, 99});
-    std::vector<Structure *> lhsCols = {lhs_col0, lhs_col1};
-    std::string lhsLabels[] = {"R.idx", "R.a"};
-    auto f = DataObjectFactory::create<Frame>(lhsCols, lhsLabels);
+    auto lhs_col0 = genGivenVals<DenseMatrix<uint64_t>>(10,  { 0, 11, 20, 33, 44, 55, 60, 77, 88, 99});
 
-    Frame * expectedResult;
+    uint64_t expectedResult;
     /// create expected result set
     {
-        std::vector<uint64_t> er_col0_val;
         uint64_t sum = 0;
-        std::string resultLabels[] = {"Agg_sum"};
         for (uint64_t i = 0; i < lhs_col0->getNumRows(); ++ i) {
-            sum += lhs_col1->get(i, 0);
+            sum += lhs_col0->get(i, 0);
         }
-        er_col0_val.push_back(sum);
-        uint64_t size = er_col0_val.size();
-        auto er_col0 = genGivenVals<DenseMatrix<uint64_t>>(size, er_col0_val);
         /// create result data
-        expectedResult = DataObjectFactory::create<Frame>(
-                std::vector<Structure*>{er_col0},
-                resultLabels);
-        /// cleanup
-        DataObjectFactory::destroy(er_col0);
-        DataObjectFactory::destroy(lhs_col0, lhs_col1);
+        expectedResult = sum;
     }
 
-    /// test execution
-    Frame * resultFrame = nullptr;
 
-    agg_sum(resultFrame, f, "R.a");
+    uint64_t result = aggMorph<uint64_t, DenseMatrix<uint64_t>>(AggOpCode::SUM, lhs_col0, nullptr);
 
     /// test if result matches expected result
-    CHECK(*resultFrame == *expectedResult);
+    CHECK(result == expectedResult);
 
     /// cleanup
-    DataObjectFactory::destroy(resultFrame, expectedResult, f);
+    DataObjectFactory::destroy(lhs_col0);
 
 }

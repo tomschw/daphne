@@ -345,3 +345,67 @@ TEST_CASE("Morphstore Naturaljoin: Test the Equals operation with more than two 
     DataObjectFactory::destroy(resultFrame, expectedResult, lhs, rhs);
 
 }
+
+TEST_CASE("Morphstore Naturaljoin: Test the Equals operation with one join condition where R.a = S.a with single call", TAG_KERNELS) {
+    /// Data generation
+    auto lhs_col0 = genGivenVals<DenseMatrix<uint64_t>>(10, { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9});
+    auto lhs_col1 = genGivenVals<DenseMatrix<uint64_t>>(10,  { 0, 10, 20, 33, 44, 55, 60, 77, 88, 99});
+    std::vector<Structure *> lhsCols = {lhs_col0, lhs_col1};
+    std::string lhsLabels[] = {"R.idx", "R.a"};
+    auto lhs = DataObjectFactory::create<Frame>(lhsCols, lhsLabels);
+
+    auto rhs_col0 = genGivenVals<DenseMatrix<uint64_t>>(10, {   0,  1,  2,  3,  4,  5,  6,  7,  8,  9});
+    auto rhs_col1 = genGivenVals<DenseMatrix<uint64_t>>(10,  { 100, 90, 80, 70, 60, 20, 40, 30, 60, 10});
+    std::vector<Structure *> rhsCols = {rhs_col0, rhs_col1};
+    std::string rhsLabels[] = {"S.idx", "S.a"};
+    auto rhs = DataObjectFactory::create<Frame>(rhsCols, rhsLabels);
+
+
+    Frame * expectedResult;
+    /// create expected result set
+    {
+        std::vector<uint64_t> er_col0_val;
+        std::vector<uint64_t> er_col1_val;
+        std::vector<uint64_t> er_col2_val;
+        std::vector<uint64_t> er_col3_val;
+        for (uint64_t outerLoop = 0; outerLoop < rhs_col0->getNumRows(); ++ outerLoop) {
+            for (uint64_t innerLoop = 0; innerLoop < lhs_col0->getNumRows(); ++ innerLoop) {
+                /// condition to check
+                if (lhs_col1->get(innerLoop, 0) == rhs_col1->get(outerLoop, 0)) {
+                    er_col0_val.push_back(lhs_col0->get(innerLoop, 0));
+                    er_col1_val.push_back(lhs_col1->get(innerLoop, 0));
+                    er_col2_val.push_back(rhs_col0->get(outerLoop, 0));
+                    er_col3_val.push_back(rhs_col1->get(outerLoop, 0));
+                }
+            }
+        }
+        uint64_t size = er_col0_val.size();
+        auto er_col0 = genGivenVals<DenseMatrix<uint64_t>>(size, er_col0_val);
+        auto er_col1 = genGivenVals<DenseMatrix<uint64_t>>(size, er_col1_val);
+        auto er_col2 = genGivenVals<DenseMatrix<uint64_t>>(size, er_col2_val);
+        auto er_col3 = genGivenVals<DenseMatrix<uint64_t>>(size, er_col3_val);
+        std::string labels[] = {"R.idx", "R.a", "S.idx", "S.a"};
+        /// create result data
+        expectedResult = DataObjectFactory::create<Frame>(
+                std::vector<Structure*>{er_col0,er_col1,er_col2, er_col3},
+                labels);
+        /// cleanup
+        DataObjectFactory::destroy(er_col0, er_col1, er_col2, er_col3);
+        DataObjectFactory::destroy(lhs_col0, lhs_col1, rhs_col0, rhs_col1);
+    }
+
+    /// test execution
+    Frame * resultFrame = nullptr;
+
+    /// R.a == S.a
+    auto lhsQLabels = "R.a";
+    auto rhsQLabels = "S.a";
+    naturaljoin(resultFrame, lhs, rhs, lhsQLabels, rhsQLabels, nullptr);
+
+    /// test if result matches expected result
+    CHECK(*resultFrame == *expectedResult);
+
+    /// cleanup
+    DataObjectFactory::destroy(resultFrame, expectedResult, lhs, rhs);
+
+}

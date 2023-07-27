@@ -73,9 +73,6 @@ TEST_CASE("Morphstore Project: Test the operator", TAG_KERNELS) {
 
     project(resultFrame, lhs, pos, nullptr);
 
-    resultFrame->print(std::cout);
-    expectedResult->print(std::cout);
-
     /// test if result matches expected result
     CHECK(*resultFrame == *expectedResult);
 

@@ -34,11 +34,17 @@ template<class DTRes, class DTInLeft, class DTInRight>
 class Naturaljoin {
 public:
     static void apply(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char ** inOnLeft, size_t numLhsOn, const char ** inOnRight, size_t numRhsOn) = delete;
+    static void apply(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) = delete;
 };
 
 template<class DTRes, class DTInLeft, class DTInRight, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
 void naturaljoin(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char ** inOnLeft, size_t numLhsOn, const char ** inOnRight, size_t numRhsOn) {
     Naturaljoin<DTRes, DTInLeft, DTInRight>::apply(res, inLeft, inRight, inOnLeft, numLhsOn, inOnRight, numRhsOn);
+}
+
+template<class DTRes, class DTInLeft, class DTInRight, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+void naturaljoin(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) {
+    Naturaljoin<DTRes, DTInLeft, DTInRight>::apply(res, inLeft, inRight, inOnLeft, inOnRight, ctx);
 }
 
 template<>
@@ -128,6 +134,80 @@ public:
 
     }
 
+    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+    static void apply(Frame * & res, const Frame * inLeft, const Frame * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) {
+
+        const morphstore::column<morphstore::uncompr_f> *selectPosLeft= nullptr;
+        const morphstore::column<morphstore::uncompr_f> *selectPosRight= nullptr;
+
+        auto colDataLeft = static_cast<uint64_t const *>(inLeft->getColumnRaw(inLeft->getColumnIdx(inOnLeft)));
+        auto colDataRight = static_cast<uint64_t const *>(inRight->getColumnRaw(inRight->getColumnIdx(inOnRight)));
+
+        const morphstore::column<morphstore::uncompr_f> * const joinColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inLeft->getNumRows(), colDataLeft);
+        const morphstore::column<morphstore::uncompr_f> * const joinColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inRight->getNumRows(), colDataRight);
+
+        auto currentPosCol = morphstore::natural_equi_join<ve, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f>(joinColLeft, joinColRight);
+
+        selectPosLeft = std::get<0>(currentPosCol);
+        selectPosRight = std::get<1>(currentPosCol);
+
+        /// @todo Check which elements should be deleted.
+        // delete currentPosCol, delete join_col_left, delete join_col_right, delete col_data_left, delete col_data_right;
+
+        const std::string *columnLabelsLeft = inLeft->getLabels();
+        const std::string *columnLabelsRight = inRight->getLabels();
+        std::string* columnLabels = NULL;
+        columnLabels = new std::string[inLeft->getNumCols()+inRight->getNumCols()];
+
+        std::vector<Structure *> resultCols = {};
+        for (size_t i = 0; i < inLeft->getNumCols(); ++ i) {
+            auto colProjData = static_cast<uint64_t const *>(inLeft->getColumnRaw(inLeft->getColumnIdx(*(columnLabelsLeft + i))));
+            auto colProj = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inLeft->getNumRows(), colProjData);
+            auto* projCol = const_cast<morphstore::column<morphstore::uncompr_f> *>(morphstore::my_project_wit_t<ve, morphstore::uncompr_f, morphstore::uncompr_f,
+                    morphstore::uncompr_f>::apply(colProj, selectPosLeft));
+
+            /// Change the persistence type to disable the deletion and deallocation of the data.
+            projCol->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+
+            uint64_t * ptr = projCol->get_data();
+
+            std::shared_ptr<uint64_t[]> shrdPtr(ptr);
+
+            auto result = DataObjectFactory::create<DenseMatrix<uint64_t>>(projCol->get_count_values(), 1, shrdPtr);
+
+            resultCols.push_back(result);
+            columnLabels[i] = *(columnLabelsLeft + i);
+            delete projCol, delete colProj;
+        }
+
+        for (size_t i = 0; i < inRight->getNumCols(); ++ i) {
+            auto colProjData = static_cast<uint64_t const *>(inRight->getColumnRaw(inRight->getColumnIdx(*(columnLabelsRight + i))));
+            auto colProj = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inRight->getNumRows(), colProjData);
+            auto* projCol = const_cast<morphstore::column<morphstore::uncompr_f> *>(morphstore::my_project_wit_t<ve, morphstore::uncompr_f, morphstore::uncompr_f,
+                    morphstore::uncompr_f>::apply(colProj, selectPosRight));
+
+            /// Change the persistence type to disable the deletion and deallocation of the data.
+            projCol->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+
+            uint64_t * ptr = projCol->get_data();
+
+            std::shared_ptr<uint64_t[]> shrdPtr(ptr);
+
+            auto result = DataObjectFactory::create<DenseMatrix<uint64_t>>(projCol->get_count_values(), 1, shrdPtr);
+
+            resultCols.push_back(result);
+            columnLabels[i + inLeft->getNumCols()] = *(columnLabelsRight + i);
+            delete projCol, delete colProj;
+        }
+
+        res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
+
+        delete selectPosLeft, delete selectPosRight;
+
+    }
+
 };
+
+
 
 #endif //DAPHNE_PROTOTYPE_NATURALJOIN_H

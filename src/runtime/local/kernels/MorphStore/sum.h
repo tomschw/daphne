@@ -25,6 +25,7 @@
 #include <core/operators/otfly_derecompr/agg_sum_all.h>
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/AggOpCode.h>
+#include <runtime/local/datastructures/DenseMatrix.h>
 
 template<typename VTRes, class DTIn>
 class AggSum {

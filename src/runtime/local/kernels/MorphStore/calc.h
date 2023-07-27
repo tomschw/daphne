@@ -25,6 +25,7 @@
 #include <core/operators/otfly_derecompr/calc_uncompr.h>
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/BinaryOpCode.h>
+#include <runtime/local/datastructures/DenseMatrix.h>
 
 #include <ir/daphneir/Daphne.h>
 
@@ -35,22 +36,22 @@ enum class CalcOperation : uint32_t {
     Div = 4,
 };
 
-template<class DTRes, class DTIn>
+template<class DTRes, class DTLhs, class DTRhs>
 class Calc {
 public:
-    static void apply(DTRes * & res, const DTIn * inLhs, const DTIn inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) = delete;
+    static void apply(BinaryOpCode calc, DTRes * & res, const DTLhs * inLhs, const DTRhs inRhs, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-void calcBinary(DTRes * & res, const DTIn * inLhs, const DTIn * inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) {
-    Calc<DTRes, DTIn>::apply(res, inLhs, inRhs, inOnLeft, inOnRight, calc);
+template<class DTRes, class DTLhs, class DTRhs, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+void calcBinary(BinaryOpCode calc, DTRes * & res, const DTLhs * inLhs, const DTRhs * inRhs, DCTX(ctx)) {
+    Calc<DTRes, DTLhs, DTRhs>::apply(calc, res, inLhs, inRhs, ctx);
 }
 
-template<>
+/**template<>
 class Calc<Frame, Frame> {
 public:
     template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
-    static void apply(Frame * & res, const Frame * inLhs, const Frame * inRhs, const char * inOnLeft, const char * inOnRight, BinaryOpCode calc) {
+    static void apply(BinaryOpCode calc, Frame * & res, const Frame * inLhs, const Frame * inRhs, const char * inOnLeft, const char * inOnRight) {
         assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
 
         auto colDataLeft = static_cast<uint64_t const *>(inLhs->getColumnRaw(inLhs->getColumnIdx(inOnLeft)));
@@ -118,6 +119,84 @@ public:
         std::vector<Structure *> resultCols = {resultMatrix};
 
         res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
+
+        delete result, delete opColLeft, delete opColRight;
+    }
+
+}; **/
+
+template<typename VTRes, typename VTLhs, typename VTRhs>
+class Calc<DenseMatrix<VTRes>, DenseMatrix<VTLhs>, DenseMatrix<VTRhs>> {
+public:
+    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+    static void apply(BinaryOpCode calc, DenseMatrix<VTRes> * & res, const DenseMatrix<VTLhs> * inLhs, const DenseMatrix<VTRhs> * inRhs, DCTX(ctx)) {
+        assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
+
+        auto colDataLeft = static_cast<uint64_t const *>(inLhs->getValues());
+        const morphstore::column<morphstore::uncompr_f> * const opColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inLhs->getNumRows(), colDataLeft);
+
+        auto colDataRight = static_cast<uint64_t const *>(inRhs->getValues());
+        const morphstore::column<morphstore::uncompr_f> * const opColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inRhs->getNumRows(), colDataRight);
+
+        morphstore::column<morphstore::uncompr_f> *result;
+
+        switch (calc) {
+            case BinaryOpCode::ADD:
+                result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
+                        morphstore::calc_binary<
+                        vectorlib::add,
+                        ve,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f
+                        >(opColLeft, opColRight));
+                break;
+            case BinaryOpCode::SUB:
+                result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
+                        morphstore::calc_binary<
+                        vectorlib::sub,
+                        ve,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f
+                >(opColLeft, opColRight));
+                break;
+            case BinaryOpCode::MUL:
+                result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
+                        morphstore::calc_binary<
+                        vectorlib::mul,
+                        ve,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f
+                >(opColLeft, opColRight));
+                break;
+            case BinaryOpCode::DIV:
+                result = const_cast<morphstore::column<morphstore::uncompr_f> *>(
+                        morphstore::calc_binary<
+                        vectorlib::div,
+                        ve,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f,
+                        morphstore::uncompr_f
+                >(opColLeft, opColRight));
+                break;
+        }
+
+        /// Change the persistence type to disable the deletion and deallocation of the data.
+        result->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+
+        uint64_t * ptr = result->get_data();
+
+        std::shared_ptr<uint64_t[]> shrdPtr(ptr);
+
+        res = DataObjectFactory::create<DenseMatrix<uint64_t>>(result->get_count_values(), 1, shrdPtr);
+
+        //const std::string columnLabels[] = {"Calc"};
+
+        //std::vector<Structure *> resultCols = {resultMatrix};
+
+        //res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
 
         delete result, delete opColLeft, delete opColRight;
     }

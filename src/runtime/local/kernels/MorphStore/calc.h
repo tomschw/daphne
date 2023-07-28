@@ -26,6 +26,7 @@
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/BinaryOpCode.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datagen/GenGivenVals.h>
 
 #include <ir/daphneir/Daphne.h>
 
@@ -184,13 +185,20 @@ public:
         }
 
         /// Change the persistence type to disable the deletion and deallocation of the data.
-        result->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+        //result->set_persistence_type(morphstore::storage_persistence_type::externalScope);
+        
 
         VTRes * ptr = result->get_data();
 
-        std::shared_ptr<VTRes[]> shrdPtr(ptr);
+        //std::shared_ptr<VTRes[]> shrdPtr(new (std::align_val_t(64)) VTRes[result->get_count_values()]);//(ptr);
+        std::vector<VTRes> data(ptr, ptr + result->get_count_values());
+        if (data.size() == 0) {
+            res = DataObjectFactory::create<DenseMatrix<VTRes>>(0, 1, false);
+        } else {
+            res = genGivenVals<DenseMatrix<VTRes>>(data.size(), data);
+        }
 
-        res = DataObjectFactory::create<DenseMatrix<VTRes>>(result->get_count_values(), 1, shrdPtr);
+        //res = DataObjectFactory::create<DenseMatrix<VTRes>>(result->get_count_values(), 1, shrdPtr);
 
         //const std::string columnLabels[] = {"Calc"};
 
@@ -198,7 +206,7 @@ public:
 
         //res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
 
-        //delete result, delete opColLeft, delete opColRight;
+        delete result, delete opColLeft, delete opColRight;
     }
 
 };

@@ -71,7 +71,7 @@ TEST_CASE("Morphstore Project: Test the operator", TAG_KERNELS) {
     /// test execution
     Frame * resultFrame = nullptr;
 
-    project(resultFrame, lhs, pos, nullptr);
+    projectMorph(resultFrame, lhs, pos, nullptr);
 
     /// test if result matches expected result
     CHECK(*resultFrame == *expectedResult);

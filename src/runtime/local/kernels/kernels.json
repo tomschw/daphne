@@ -3809,5 +3809,156 @@
         "instantiations": [
             []
         ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "MorphStore/sum.h",
+            "opName": "aggMorph",
+            "returnType": "VTRes",
+            "templateParams": [
+                {
+                    "name": "VTRes",
+                    "isDataType": false
+                },
+                {
+                    "name": "DTArg",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "AggOpCode",
+                    "name": "opCode"
+                },
+                {
+                    "type": "const DTArg *",
+                    "name": "arg"
+                }
+            ]
+        },
+        "instantiations": [
+            ["int64_t", ["DenseMatrix", "int64_t"]]
+        ],
+        "opCodes": ["SUM"]
+    },
+    {
+        "kernelTemplate": {
+            "header": "MorphStore/calc.h",
+            "opName": "calcBinary",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTLhs",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTRhs",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "BinaryOpCode",
+                    "name": "opCode"
+                },
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "const DTLhs *",
+                    "name": "lhs"
+                },
+                {
+                    "type": "const DTRhs *",
+                    "name": "rhs"
+                }
+            ]
+        },
+        "api": [
+            {
+                "name":  ["CPP"],
+                "instantiations": [
+                    [["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"]],
+                    [["DenseMatrix", "int64_t"], ["DenseMatrix", "int64_t"], ["DenseMatrix", "int64_t"]]
+                ],
+                "opCodes": ["ADD", "SUB", "MUL", "DIV"]
+            }
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "MorphStore/project.h",
+            "opName": "projectMorph",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTArg",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTSel",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "const DTArg *",
+                    "name": "arg"
+                },
+                {
+                    "type": "const DenseMatrix<VTSel> *",
+                    "name": "sel"
+                }
+            ]
+        },
+        "instantiations": [
+            ["Frame", "Frame", "int64_t"]
+        ]
+    },
+    {
+    	"kernelTemplate": {
+    		"header": "MorphStore/naturaljoin.h",
+    		"opName": "naturaljoin",
+    		"returnType": "void",
+    		"templateParams": [],
+    		"runtimeParams": [
+    			{
+    				"type": "Frame *&",
+    				"name": "res"
+    			},
+    			{
+    				"type": "const Frame *",
+    				"name": "lhs"
+    			},
+    			{
+    				"type": "const Frame *",
+    				"name": "rhs"
+    			},
+    			{
+    				"type": "const char *",
+    				"name": "lhsOn"
+    			},
+    			{
+    				"type": "const char *",
+    				"name": "rhsOn"
+    			}
+    		]
+    	},
+    	"instantiations": [
+    		[]
+    	]
     }
 ]

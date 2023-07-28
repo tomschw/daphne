@@ -663,6 +663,73 @@ mlir::OpFoldResult mlir::daphne::EwDivOp::fold(FoldAdaptor adaptor) {
     return {};
 }
 
+mlir::OpFoldResult mlir::daphne::MorphAddOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
+    auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a + b; };
+    // TODO: we could check overflows
+    auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a + b; };
+    if(auto res = constFoldBinaryOp<FloatAttr>(getType(), operands, floatOp))
+        return res;
+    if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, intOp))
+        return res;
+    return {};
+}
+
+mlir::OpFoldResult mlir::daphne::MorphSubOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
+    auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a - b; };
+    auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a - b; };
+    if(auto res = constFoldBinaryOp<FloatAttr>(getType(), operands, floatOp))
+        return res;
+    if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, intOp))
+        return res;
+    return {};
+}
+
+mlir::OpFoldResult mlir::daphne::MorphMulOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
+    auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a * b; };
+    auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return a * b; };
+    if(auto res = constFoldBinaryOp<FloatAttr>(getType(), operands, floatOp))
+        return res;
+    if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, intOp))
+        return res;
+    return {};
+}
+
+mlir::OpFoldResult mlir::daphne::MorphDivOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
+    auto floatOp = [](const llvm::APFloat &a, const llvm::APFloat &b) { return a / b; };
+    auto sintOp = [&](const llvm::APInt &a, const llvm::APInt &b) {
+        if(b == 0) {
+            std::string msg = "Can't divide by 0";
+            emitError() << msg;
+            throw std::runtime_error(msg);
+        }
+        return a.sdiv(b);
+    };
+    auto uintOp = [&](const llvm::APInt &a, const llvm::APInt &b) {
+        if(b == 0) {
+            std::string msg = "Can't divide by 0";
+            emitError() << msg;
+            throw std::runtime_error(msg);
+        }
+        return a.udiv(b);
+    };
+
+    if(auto res = constFoldBinaryOp<FloatAttr>(getType(), operands, floatOp))
+        return res;
+    if(getType().isSignedInteger()) {
+        if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, sintOp))
+            return res;
+    }
+    else if(getType().isUnsignedInteger()) {
+        if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, uintOp))
+            return res;
+    }
+    return {};
+}
+
 mlir::OpFoldResult mlir::daphne::EwPowOp::fold(FoldAdaptor adaptor) {
     ArrayRef<Attribute> operands = adaptor.getOperands();
     // TODO: EwPowOp integer constant folding
@@ -1313,6 +1380,147 @@ mlir::LogicalResult mlir::daphne::EwMulOp::canonicalize(
  */
 mlir::LogicalResult mlir::daphne::EwDivOp::canonicalize(
         mlir::daphne::EwDivOp op, PatternRewriter &rewriter
+) {
+    mlir::Value lhs = op.getLhs();
+    mlir::Value rhs = op.getRhs();
+    const bool lhsIsSca = !lhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    const bool rhsIsSca = !rhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    const bool rhsIsFP = CompilerUtils::getValueType(rhs.getType()).isa<mlir::FloatType>();
+    if(lhsIsSca && !rhsIsSca && rhsIsFP) {
+        rewriter.replaceOpWithNewOp<mlir::daphne::EwMulOp>(
+                op,
+                op.getResult().getType(),
+                rewriter.create<mlir::daphne::EwPowOp>(
+                        op->getLoc(),
+                        mlir::daphne::UnknownType::get(op->getContext()), // to be inferred
+                        rhs,
+                        rewriter.create<mlir::daphne::ConstantOp>(op->getLoc(), double(-1))
+                ),
+                lhs
+        );
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+/**
+ * @brief Replaces (1) `a + b` by `a concat b`, if `a` or `b` is a string,
+ * and (2) `a + X` by `X + a` (`a` scalar, `X` matrix/frame).
+ * 
+ * (1) is important, since we use the `+`-operator for both addition and
+ * string concatenation in DaphneDSL, while the types of the operands might be
+ * known only after type inference.
+ * 
+ * (2) is important, since our kernels for elementwise binary operations only support
+ * scalars as the right-hand-side operand so far (see #203).
+ * 
+ * @param op
+ * @param rewriter
+ * @return 
+ */
+mlir::LogicalResult mlir::daphne::MorphAddOp::canonicalize(
+        mlir::daphne::MorphAddOp op, PatternRewriter &rewriter
+) {
+    mlir::Value lhs = op.getLhs();
+    mlir::Value rhs = op.getRhs();
+
+    const bool lhsIsStr = lhs.getType().isa<mlir::daphne::StringType>();
+    const bool rhsIsStr = rhs.getType().isa<mlir::daphne::StringType>();
+    if(lhsIsStr || rhsIsStr) {
+        mlir::Type strTy = mlir::daphne::StringType::get(rewriter.getContext());
+        if(!lhsIsStr)
+            lhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, lhs);
+        if(!rhsIsStr)
+            rhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, rhs);
+        rewriter.replaceOpWithNewOp<mlir::daphne::ConcatOp>(op, strTy, lhs, rhs);
+        return mlir::success();
+    }
+    else {
+        const bool lhsIsSca = !lhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+        const bool rhsIsSca = !rhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+        if(lhsIsSca && !rhsIsSca) {
+            rewriter.replaceOpWithNewOp<mlir::daphne::EwAddOp>(op, op.getResult().getType(), rhs, lhs);
+            return mlir::success();
+        }
+        return mlir::failure();
+    }
+}
+
+/**
+ * @brief Replaces `a - X` by `(X * -1) + a` (`a` scalar, `X` matrix/frame).
+ * 
+ * This is important, since our kernels for elementwise binary operations only support
+ * scalars as the right-hand-side operand so far (see #203).
+ * 
+ * As a downside, an additional operation and intermediate result is introduced.
+ * 
+ * @param op
+ * @param rewriter
+ * @return 
+ */
+mlir::LogicalResult mlir::daphne::MorphSubOp::canonicalize(
+        mlir::daphne::MorphSubOp op, PatternRewriter &rewriter
+) {
+    mlir::Value lhs = op.getLhs();
+    mlir::Value rhs = op.getRhs();
+    const bool lhsIsSca = !lhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    const bool rhsIsSca = !rhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    if(lhsIsSca && !rhsIsSca) {
+        rewriter.replaceOpWithNewOp<mlir::daphne::EwAddOp>(
+                op,
+                op.getResult().getType(),
+                rewriter.create<mlir::daphne::EwMulOp>(
+                        op->getLoc(),
+                        mlir::daphne::UnknownType::get(op->getContext()), // to be inferred
+                        rhs,
+                        rewriter.create<mlir::daphne::ConstantOp>(op->getLoc(), int64_t(-1))
+                ),
+                lhs
+        );
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+/**
+ * @brief Replaces `a * X` by `X * a` (`a` scalar, `X` matrix/frame).
+ * 
+ * This is important, since our kernels for elementwise binary operations only support
+ * scalars as the right-hand-side operand so far (see #203).
+ * 
+ * @param op
+ * @param rewriter
+ * @return 
+ */
+mlir::LogicalResult mlir::daphne::MorphMulOp::canonicalize(
+        mlir::daphne::MorphMulOp op, PatternRewriter &rewriter
+) {
+    mlir::Value lhs = op.getLhs();
+    mlir::Value rhs = op.getRhs();
+    const bool lhsIsSca = !lhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    const bool rhsIsSca = !rhs.getType().isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+    if(lhsIsSca && !rhsIsSca) {
+        rewriter.replaceOpWithNewOp<mlir::daphne::EwMulOp>(op, op.getResult().getType(), rhs, lhs);
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+/**
+ * @brief Replaces `a / X` by `(X ^ -1) * a` (`a` scalar, `X` matrix/frame),
+ * if `X` has a floating-point value type.
+ * 
+ * This is important, since our kernels for elementwise binary operations only support
+ * scalars as the right-hand-side operand so far (see #203).
+ * 
+ * As a downside, an additional operation and intermediate result is introduced.
+ * 
+ * @param op
+ * @param rewriter
+ * @return 
+ */
+mlir::LogicalResult mlir::daphne::MorphDivOp::canonicalize(
+        mlir::daphne::MorphDivOp op, PatternRewriter &rewriter
 ) {
     mlir::Value lhs = op.getLhs();
     mlir::Value rhs = op.getRhs();

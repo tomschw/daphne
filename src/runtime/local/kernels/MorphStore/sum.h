@@ -43,7 +43,7 @@ class AggSum<VTRes, DenseMatrix<VTArg>> {
 public:
     template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static VTRes apply(AggOpCode agg, const DenseMatrix<VTArg> * in, DCTX(ctx)) {
-        auto colData = static_cast<uint64_t const *>(in->getValues());
+        auto colData = reinterpret_cast<const uint64_t*>(in->getValues());
         const morphstore::column<morphstore::uncompr_f> * const aggCol = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * in->getNumRows(), colData);
 
         morphstore::column<morphstore::uncompr_f> * aggResult = nullptr;
@@ -53,7 +53,7 @@ public:
         /// Change the persistence type to disable the deletion and deallocation of the data.
         //aggResult->set_persistence_type(morphstore::storage_persistence_type::externalScope);
 
-        uint64_t * ptr = aggResult->get_data();
+        VTRes * ptr = aggResult->get_data();
 
         /**std::shared_ptr<uint64_t[]> shrdPtr(ptr);
 

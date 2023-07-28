@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_RUNTIME_LOCAL_KERNELS_FILTERROW_H
-#define SRC_RUNTIME_LOCAL_KERNELS_FILTERROW_H
+#ifndef SRC_RUNTIME_LOCAL_KERNELS_MORPHSTORE_PROJECT_H
+#define SRC_RUNTIME_LOCAL_KERNELS_MORPHSTORE_PROJECT_H
 
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
@@ -47,7 +47,7 @@ struct Project {
 // ****************************************************************************
 
 template<class DTRes, class DTArg, typename VTSel>
-void project(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) {
+void projectMorph(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) {
     Project<DTRes, DTArg, VTSel>::apply(res, arg, sel, ctx);
 }
 
@@ -59,14 +59,11 @@ void project(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * sel, DC
 // Frame <- Frame
 // ----------------------------------------------------------------------------
 
-// 0 (row-wise) or 1 (column-wise)
-#define FILTERROW_FRAME_MODE 0
-
 template<typename VTSel>
 struct Project<Frame, Frame, VTSel> {
     template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(Frame *& res, const Frame * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) {
-        auto colData = static_cast<uint64_t const *>(sel->getValues());
+        auto colData =  reinterpret_cast<uint64_t const *>(sel->getValues());
         std::vector<uint64_t> positions;
         for (size_t i = 0; i < sel->getNumRows(); i++) {
             if(colData[i] == 1) {
@@ -109,4 +106,4 @@ struct Project<Frame, Frame, VTSel> {
 };
 
 
-#endif //SRC_RUNTIME_LOCAL_KERNELS_FILTERROW_H
+#endif //SRC_RUNTIME_LOCAL_KERNELS_MORPHSTORE_PROJECT_H

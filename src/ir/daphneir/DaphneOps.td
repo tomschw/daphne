@@ -243,33 +243,6 @@ class Daphne_EwBinaryOp<string name, Type scalarType, list<Trait> traits = []>
     let hasFolder = 1;
 }
 
-// ****************************************************************************
-// Elementwise binary morphstore
-// ****************************************************************************
-
-// TODO Temporarily commented, because otherwise it cannot handle UnknownType.
-class Daphne_MorphstoreBinaryOp<string name, Type scalarType, list<Trait> traits = []>
-//: Daphne_Op<name, !listconcat([TypesMatchOrOneIsMatrixOfOther<"lhs", "rhs">], traits)> {
-: Daphne_Op<name, !listconcat(traits, [
-    DataTypeFromArgs,
-    DeclareOpInterfaceMethods<DistributableOpInterface>,
-    DeclareOpInterfaceMethods<VectorizableOpInterface>,
-    ShapeEwBinary,
-    CastArgsToResType
-])> {
-    let arguments = (ins AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$lhs, AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$rhs);
-    let results = (outs AnyTypeOf<[MatrixOf<[scalarType]>, scalarType]>:$res);
-
-    let builders = [
-        OpBuilder<(ins "Value":$lhs, "Value":$rhs), [{
-        // TODO This is wrong if lhs is a scalar and rhs is a matrix.
-        $_state.addTypes(lhs.getType());
-        $_state.addOperands({lhs, rhs});
-        }]>
-    ];
-    let hasFolder = 1;
-}
-
 // ----------------------------------------------------------------------------
 // Arithmetic
 // ----------------------------------------------------------------------------
@@ -340,7 +313,7 @@ def Daphne_EwGtOp  : Daphne_EwCmpOp<"ewGt" , AnyScalar>;
 def Daphne_EwGeOp  : Daphne_EwCmpOp<"ewGe" , AnyScalar>;
 
 // ----------------------------------------------------------------------------
-// Comparisons Morphstore
+// Comparisons MorphStore
 // ----------------------------------------------------------------------------
 
 class Daphne_MorphStoreCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
@@ -356,6 +329,56 @@ def Daphne_MorphStoreSelectLtOp  : Daphne_MorphStoreCmpOp<"selectLt" , AnyScalar
 def Daphne_MorphStoreSelectLeOp  : Daphne_MorphStoreCmpOp<"selectLe" , AnyScalar>;
 def Daphne_MorphStoreSelectGtOp  : Daphne_MorphStoreCmpOp<"selectGt" , AnyScalar>;
 def Daphne_MorphStoreSelectGeOp  : Daphne_MorphStoreCmpOp<"selectGe" , AnyScalar>;
+
+// ----------------------------------------------------------------------------
+// Arithmetic MorphStore
+// ----------------------------------------------------------------------------
+
+// TODO Make EwAddOp Commutative again (see #449).
+def Daphne_MorphAddOp    : Daphne_EwBinaryOp<"calcAdd", NumScalar, [ValueTypeFromArgs/*, Commutative*/, EwSparseIfBoth, CUDASupport]> {
+    let hasCanonicalizeMethod = 1;
+}
+def Daphne_MorphSubOp    : Daphne_EwBinaryOp<"calcSub", NumScalar, [ValueTypeFromArgs, EwSparseIfBoth, CUDASupport]> {
+    let hasCanonicalizeMethod = 1;
+}
+def Daphne_MorphMulOp    : Daphne_EwBinaryOp<"calcMul", NumScalar, [ValueTypeFromArgs, Commutative, EwSparseIfEither, CUDASupport]> {
+    let hasCanonicalizeMethod = 1;
+}
+def Daphne_MorphDivOp    : Daphne_EwBinaryOp<"calcDiv", NumScalar, [ValueTypeFromArgs, CUDASupport]> {
+    let hasCanonicalizeMethod = 1;
+}
+
+def Daphne_ProjectOp : Daphne_Op<"projectMorph", [
+    TypeFromFirstArg,
+    DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
+    NumColsFromArg
+]> {
+    let summary = "Filters the rows of a data object according to a bit vector";
+
+    let description = [{
+        Filters the rows of a data object (matrix or frame) according to a bit
+        vector. The argument `selectedRows` must be a single-column matrix. All
+        its entries must be zero or one. The value type of `selectedRows` does
+        not need to be boolean, it could also be an integer or floating-point
+        type. `selectedRows` and `source` must have the same number of rows.
+        The *i*-th row of `source` is contained in the result, if the *i*-th
+        entry of `selectedRows` is a one (in its respective value type).
+
+        Note that `ExtractRowOp` and `SliceRowOp` are similar, but work with
+        positions instead of bit vectors.
+    }];
+
+    let arguments = (ins MatrixOrFrame:$source, MatrixOrU:$selectedRows);
+    let results = (outs MatrixOrFrame:$res);
+}
+
+def Daphne_MorphJoinOp : Daphne_Op<"naturaljoin", [
+    DataTypeFrm, ValueTypesConcat,
+    DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
+]> {
+    let arguments = (ins FrameOrU:$lhs, FrameOrU:$rhs, StrScalar:$lhsOn, StrScalar:$rhsOn);
+    let results = (outs FrameOrU:$res);
+}
 
 // ****************************************************************************
 // Outer binary (generalized outer product)
@@ -459,6 +482,12 @@ def Daphne_AllAggMaxOp    : Daphne_AllAggOp<"maxAll", NumScalar, [ValueTypeFromF
 def Daphne_AllAggMeanOp   : Daphne_AllAggOp<"meanAll", NumScalar, [ValueTypeFromArgsFP]>;
 def Daphne_AllAggVarOp    : Daphne_AllAggOp<"varAll", NumScalar, [ValueTypeFromArgsFP]>;
 def Daphne_AllAggStddevOp : Daphne_AllAggOp<"stddevAll", NumScalar, [ValueTypeFromArgsFP]>;
+
+// ----------------------------------------------------------------------------
+// Aggregation MorphStore
+// ----------------------------------------------------------------------------
+
+def Daphne_MorphStoreAggSumOp    : Daphne_AllAggOp<"sumMorph", NumScalar, [ValueTypeFromFirstArg]>;
 
 // ----------------------------------------------------------------------------
 // Row/column-wise aggregation

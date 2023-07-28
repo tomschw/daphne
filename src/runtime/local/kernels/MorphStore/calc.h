@@ -132,10 +132,10 @@ public:
     static void apply(BinaryOpCode calc, DenseMatrix<VTRes> * & res, const DenseMatrix<VTLhs> * inLhs, const DenseMatrix<VTRhs> * inRhs, DCTX(ctx)) {
         assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
 
-        auto colDataLeft = static_cast<uint64_t const *>(inLhs->getValues());
+        auto colDataLeft = reinterpret_cast<const uint64_t*>(inLhs->getValues());
         const morphstore::column<morphstore::uncompr_f> * const opColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inLhs->getNumRows(), colDataLeft);
 
-        auto colDataRight = static_cast<uint64_t const *>(inRhs->getValues());
+        auto colDataRight = reinterpret_cast<const uint64_t*>(inRhs->getValues());
         const morphstore::column<morphstore::uncompr_f> * const opColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inRhs->getNumRows(), colDataRight);
 
         morphstore::column<morphstore::uncompr_f> *result;
@@ -186,11 +186,11 @@ public:
         /// Change the persistence type to disable the deletion and deallocation of the data.
         result->set_persistence_type(morphstore::storage_persistence_type::externalScope);
 
-        uint64_t * ptr = result->get_data();
+        VTRes * ptr = result->get_data();
 
-        std::shared_ptr<uint64_t[]> shrdPtr(ptr);
+        std::shared_ptr<VTRes[]> shrdPtr(ptr);
 
-        res = DataObjectFactory::create<DenseMatrix<uint64_t>>(result->get_count_values(), 1, shrdPtr);
+        res = DataObjectFactory::create<DenseMatrix<VTRes>>(result->get_count_values(), 1, shrdPtr);
 
         //const std::string columnLabels[] = {"Calc"};
 
@@ -198,7 +198,7 @@ public:
 
         //res = DataObjectFactory::create<Frame>(resultCols, columnLabels);
 
-        delete result, delete opColLeft, delete opColRight;
+        //delete result, delete opColLeft, delete opColRight;
     }
 
 };

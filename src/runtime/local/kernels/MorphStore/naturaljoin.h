@@ -145,12 +145,18 @@ public:
 
         const morphstore::column<morphstore::uncompr_f> * const joinColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inLeft->getNumRows(), colDataLeft);
         const morphstore::column<morphstore::uncompr_f> * const joinColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * inRight->getNumRows(), colDataRight);
+        
+        if(inRight->getNumRows() < inLeft->getNumRows()) {
+            auto currentPosCol = morphstore::natural_equi_join<ve, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f>(joinColRight, joinColLeft);
 
-        auto currentPosCol = morphstore::natural_equi_join<ve, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f>(joinColLeft, joinColRight);
+            selectPosRight = std::get<0>(currentPosCol);
+            selectPosLeft = std::get<1>(currentPosCol);
+        } else {
+            auto currentPosCol = morphstore::natural_equi_join<ve, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f, morphstore::uncompr_f>(joinColLeft, joinColRight);
 
-        selectPosLeft = std::get<0>(currentPosCol);
-        selectPosRight = std::get<1>(currentPosCol);
-
+            selectPosLeft = std::get<0>(currentPosCol);
+            selectPosRight = std::get<1>(currentPosCol);
+        }
         /// @todo Check which elements should be deleted.
         // delete currentPosCol, delete join_col_left, delete join_col_right, delete col_data_left, delete col_data_right;
 

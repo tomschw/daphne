@@ -349,3 +349,27 @@ antlrcpp::Any MorphStoreSQLVisitor::visitInnerJoin(
     );
 
 }
+
+antlrcpp::Any MorphStoreSQLVisitor::visitAndExpr(
+    SQLGrammarParser::AndExprContext * ctx
+)
+{
+    mlir::Location loc = utils.getLoc(ctx->start);
+
+    antlrcpp::Any vLhs = visit(ctx->lhs);
+    antlrcpp::Any vRhs = visit(ctx->rhs);
+
+    if(!isBitSet(sqlFlag, (int64_t)SQLBit::codegen)){
+        return nullptr;
+    }
+
+    mlir::Value lhs = utils.valueOrError(vLhs);
+    mlir::Value rhs = utils.valueOrError(vRhs);
+
+    lhs = castToIntMatrixColumn(lhs);
+    rhs = castToIntMatrixColumn(rhs);
+
+    return static_cast<mlir::Value>(builder.create<mlir::daphne::MorphAndOp>(
+        loc, lhs, rhs
+    ));
+}

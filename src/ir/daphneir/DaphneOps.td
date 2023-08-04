@@ -348,6 +348,9 @@ def Daphne_MorphDivOp    : Daphne_EwBinaryOp<"calcDiv", NumScalar, [ValueTypeFro
     let hasCanonicalizeMethod = 1;
 }
 
+def Daphne_MorphAndOp    : Daphne_EwBinaryOp<"andMorph", NumScalar, [Commutative, ValueTypeFromArgsInt]>;
+
+
 def Daphne_ProjectOp : Daphne_Op<"projectMorph", [
     TypeFromFirstArg,
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,

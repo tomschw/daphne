@@ -849,6 +849,18 @@ mlir::OpFoldResult mlir::daphne::EwAndOp::fold(FoldAdaptor adaptor) {
     return {};
 }
 
+mlir::OpFoldResult mlir::daphne::MorphAndOp::fold(FoldAdaptor adaptor) {
+    ArrayRef<Attribute> operands = adaptor.getOperands();
+    auto boolOp = [](const bool &a, const bool &b) { return a && b; };
+    auto intOp = [](const llvm::APInt &a, const llvm::APInt &b) { return (a != 0) && (b != 0); };
+    if(auto res = constFoldBinaryCmpOp<BoolAttr>(operands, boolOp))
+        return res;
+    // TODO: should output bool?
+    if(auto res = constFoldBinaryOp<IntegerAttr>(getType(), operands, intOp))
+        return res;
+    return {};
+}
+
 mlir::OpFoldResult mlir::daphne::EwOrOp::fold(FoldAdaptor adaptor) {
     ArrayRef<Attribute> operands = adaptor.getOperands();
     auto boolOp = [](const bool &a, const bool &b) { return a || b; };

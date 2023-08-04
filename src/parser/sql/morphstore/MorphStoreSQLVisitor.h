@@ -28,6 +28,7 @@ class MorphStoreSQLVisitor : public SQLVisitor{
     antlrcpp::Any visitAddExpr(SQLGrammarParser::AddExprContext * ctx) override;
     antlrcpp::Any visitGroupAggExpr(SQLGrammarParser::GroupAggExprContext * ctx) override;
     antlrcpp::Any visitInnerJoin(SQLGrammarParser::InnerJoinContext * ctx) override;
+    antlrcpp::Any visitAndExpr(SQLGrammarParser::AndExprContext * ctx) override;
 public:
     [[maybe_unused]] explicit MorphStoreSQLVisitor(mlir::OpBuilder & builder) : SQLVisitor(builder) {
     };

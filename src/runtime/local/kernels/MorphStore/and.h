@@ -57,7 +57,11 @@ public:
                 dataLeft.push_back(i);
             }
         }
-        const morphstore::column<morphstore::uncompr_f> * const opColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * dataLeft.size(), dataLeft.data());
+        auto dataLeftAlig = new (std::align_val_t(64)) uint64_t[dataLeft.size()];
+        for (uint64_t i = 0; i < dataLeft.size(); ++i) {
+            dataLeftAlig[i] = dataLeft[i];
+        }
+        const morphstore::column<morphstore::uncompr_f> * const opColLeft = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * dataLeft.size(), dataLeftAlig);
 
         auto colDataRight = reinterpret_cast<const uint64_t*>(inRhs->getValues());
         std::vector<uint64_t> dataRight;
@@ -66,7 +70,11 @@ public:
                 dataRight.push_back(i);
             }
         }
-        const morphstore::column<morphstore::uncompr_f> * const opColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * dataRight.size(), dataRight.data());
+        auto dataRightAlig = new (std::align_val_t(64)) uint64_t[dataRight.size()];
+        for (uint64_t i = 0; i < dataRight.size(); ++i) {
+            dataRightAlig[i] = dataRight[i];
+        }
+        const morphstore::column<morphstore::uncompr_f> * const opColRight = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * dataRight.size(), dataRightAlig);
 
         morphstore::column<morphstore::uncompr_f> *result;
 

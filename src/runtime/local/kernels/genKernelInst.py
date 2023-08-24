@@ -132,6 +132,9 @@ def generateKernelInstantiation(kernelTemplateInfo, templateValues, opCodes, out
         # Obtain the name of the function to be generated from the opName by
         # removing suffices "Sca"/"Mat"/"Obj" (they are not required here), and
         # potentially by inserting the opCode into the name.
+        #if API in ["AVX512", "SCALAR", "AVX2", "SSE"]:
+        #    funcName = "TSL_" + API + "_" + opName
+        #else 
         if API != "CPP":
             funcName = API + "_" + opName
         else:
@@ -178,13 +181,30 @@ def generateKernelInstantiation(kernelTemplateInfo, templateValues, opCodes, out
 
         kernelCallString = "{}{}::apply({});\n" if opCodeAsTemplateParam else "{}{}({});\n"
 
-        outFile.write(kernelCallString.format(
-            opName if API == "CPP" else (API + "::" + opName),
-            # Template parameters, if the kernel is a template:
-            "<{}>".format(", ".join(callTemplateParams)) if len(templateValues) else "",
-            # Run-time parameters, possibly including DaphneContext:
-            ", ".join(callParams + ([] if isCreateDaphneContext else ["ctx"])),
-        ))
+        if API in ["SCALAR", "AVX512", "AVX2", "SSE"]:
+            if (API == "SCALAR"):
+                callTemplateParams.append("vectorlib::scalar<vectorlib::v64<uint64_t>>")
+            elif (API == "AVX512"):
+                callTemplateParams.append("vectorlib::avx512<vectorlib::v512<uint64_t>>")
+            elif (API == "AVX2"):
+                callTemplateParams.append("vectorlib::avx2<vectorlib::v256<uint64_t>>")
+            elif (API == "SSE"):
+                callTemplateParams.append("vectorlib::sse<vectorlib::v128<uint64_t>>")
+            outFile.write(kernelCallString.format(
+                opName,
+                # Template parameters, if the kernel is a template:
+                "<{}>".format(", ".join(callTemplateParams)),
+                # Run-time parameters, possibly including DaphneContext:
+                ", ".join(callParams + ([] if isCreateDaphneContext else ["ctx"])),
+            ))
+        else:
+            outFile.write(kernelCallString.format(
+                opName if API == "CPP" else (API + "::" + opName),
+                # Template parameters, if the kernel is a template:
+                "<{}>".format(", ".join(callTemplateParams)) if len(templateValues) else "",
+                # Run-time parameters, possibly including DaphneContext:
+                ", ".join(callParams + ([] if isCreateDaphneContext else ["ctx"])),
+            ))
         outFile.write(INDENT + "}\n")
 
     # Generate the function(s).
@@ -239,7 +259,9 @@ if __name__ == "__main__":
                             ops_inst_str += INDENT + "// {}\n".format("-" * 76)
 
                             # Include for the required header.
-                            if API != "CPP":
+                            if API in ["AVX512", "SCALAR", "AVX2", "SSE"]:
+                                header_str = header_str + "#include <runtime/local/kernels/MorphStore/{}>\n".format(kernelTemplateInfo["header"])
+                            elif API != "CPP":
                                 header_str = header_str + "#include <runtime/local/kernels/{}/{}>\n".format(API, kernelTemplateInfo["header"])
                             else:
                                 header_str = header_str + "#include <runtime/local/kernels/{}>\n".format(kernelTemplateInfo["header"])

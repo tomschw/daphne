@@ -455,12 +455,15 @@ par_clean="0"
 par_acceptAll="0"
 unknown_options=""
 BUILD_CUDA="-DUSE_CUDA=OFF"
-BUILD_MORPHSTORE="-DUSE_MORPHSTORE=OFF"
 BUILD_FPGAOPENCL="-DUSE_FPGAOPENCL=OFF"
 BUILD_DEBUG="-DCMAKE_BUILD_TYPE=Release"
 BUILD_MPI="-DUSE_MPI=OFF"
 WITH_DEPS=1
 WITH_SUBMODULE_UPDATE=1
+BUILD_AVX2="-DUSE_AVX2=OFF"
+BUILD_AVX512="-DUSE_AVX512=OFF"
+BUILD_SCALAR="-DUSE_SCALAR=OFF"
+BUILD_SSE="-DUSE_SSE=OFF"
 
 while [[ $# -gt 0 ]]; do
     key=$1
@@ -499,10 +502,6 @@ while [[ $# -gt 0 ]]; do
         echo using CUDA
         export BUILD_CUDA="-DUSE_CUDA=ON"
         ;;
-    --morphstore)
-        echo using MORPHSTORE
-        export BUILD_MORPHSTORE="-DUSE_MORPHSTORE=ON"
-        ;;
     --fpgaopencl)
         echo using FPGAOPENCL
         export BUILD_FPGAOPENCL="-DUSE_FPGAOPENCL=ON"
@@ -514,6 +513,22 @@ while [[ $# -gt 0 ]]; do
     --debug)
         echo building DEBUG version
         export BUILD_DEBUG="-DCMAKE_BUILD_TYPE=Debug"
+        ;;
+    --scalar)
+        echo using SCALAR
+        export BUILD_SCALAR="-DUSE_SCALAR=ON"
+        ;;
+    --sse)
+        echo using SSE
+        export BUILD_SSE="-DUSE_SSE=ON"
+        ;;
+    --avx2)
+        echo using AVX2
+        export BUILD_AVX2="-DUSE_AVX2=ON"
+        ;;
+    --avx512)
+        echo using AVX512
+        export BUILD_AVX512="-DUSE_AVX512=ON"
         ;;
     --installPrefix)
         installPrefix=$1
@@ -993,7 +1008,7 @@ daphne_msg "Build Daphne"
 
 cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVersion" \
     -DCMAKE_PREFIX_PATH="$installPrefix" \
-    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_MORPHSTORE
+    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_SCALAR $BUILD_SSE $BUILD_AVX2 $BUILD_AVX512
 
 cmake --build "$daphneBuildDir" --target "$target"
 

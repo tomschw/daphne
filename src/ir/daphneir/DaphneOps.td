@@ -33,6 +33,7 @@ include "ir/daphneir/DaphneTypeAdaptationTraits.td"
 include "ir/daphneir/DaphneTypeInferenceTraits.td"
 include "ir/daphneir/CUDASupport.td"
 include "ir/daphneir/FPGAOPENCLSupport.td"
+include "ir/daphneir/VectorExtensionSupport.td"
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -317,7 +318,7 @@ def Daphne_EwGeOp  : Daphne_EwCmpOp<"ewGe" , AnyScalar>;
 // ----------------------------------------------------------------------------
 
 class Daphne_MorphStoreCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
-: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeFromArgs])> {
+: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeFromArgs, VectorExtensionSupport])> {
 // TODO: We do not enforce (matrix of) boolean output any more, but should
 // think about that again.
 //let results = (outs AnyTypeOf<[MatrixOf<[BoolScalar]>, BoolScalar]>:$res);
@@ -335,26 +336,27 @@ def Daphne_MorphStoreSelectGeOp  : Daphne_MorphStoreCmpOp<"selectGe" , AnyScalar
 // ----------------------------------------------------------------------------
 
 // TODO Make EwAddOp Commutative again (see #449).
-def Daphne_MorphAddOp    : Daphne_EwBinaryOp<"calcAdd", NumScalar, [ValueTypeFromArgs/*, Commutative*/, EwSparseIfBoth, CUDASupport]> {
+def Daphne_MorphAddOp    : Daphne_EwBinaryOp<"calcAdd", NumScalar, [ValueTypeFromArgs/*, Commutative*/, EwSparseIfBoth, CUDASupport, VectorExtensionSupport]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_MorphSubOp    : Daphne_EwBinaryOp<"calcSub", NumScalar, [ValueTypeFromArgs, EwSparseIfBoth, CUDASupport]> {
+def Daphne_MorphSubOp    : Daphne_EwBinaryOp<"calcSub", NumScalar, [ValueTypeFromArgs, EwSparseIfBoth, CUDASupport, VectorExtensionSupport]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_MorphMulOp    : Daphne_EwBinaryOp<"calcMul", NumScalar, [ValueTypeFromArgs, Commutative, EwSparseIfEither, CUDASupport]> {
+def Daphne_MorphMulOp    : Daphne_EwBinaryOp<"calcMul", NumScalar, [ValueTypeFromArgs, Commutative, EwSparseIfEither, CUDASupport, VectorExtensionSupport]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_MorphDivOp    : Daphne_EwBinaryOp<"calcDiv", NumScalar, [ValueTypeFromArgs, CUDASupport]> {
+def Daphne_MorphDivOp    : Daphne_EwBinaryOp<"calcDiv", NumScalar, [ValueTypeFromArgs, CUDASupport, VectorExtensionSupport]> {
     let hasCanonicalizeMethod = 1;
 }
 
-def Daphne_MorphAndOp    : Daphne_EwBinaryOp<"andMorph", NumScalar, [Commutative, ValueTypeFromArgsInt]>;
+def Daphne_MorphAndOp    : Daphne_EwBinaryOp<"andMorph", NumScalar, [Commutative, ValueTypeFromArgsInt, VectorExtensionSupport]>;
 
 
 def Daphne_ProjectOp : Daphne_Op<"projectMorph", [
     TypeFromFirstArg,
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
-    NumColsFromArg
+    NumColsFromArg,
+    VectorExtensionSupport
 ]> {
     let summary = "Filters the rows of a data object according to a bit vector";
 
@@ -378,6 +380,7 @@ def Daphne_ProjectOp : Daphne_Op<"projectMorph", [
 def Daphne_MorphJoinOp : Daphne_Op<"naturaljoin", [
     DataTypeFrm, ValueTypesConcat,
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
+    VectorExtensionSupport
 ]> {
     let arguments = (ins FrameOrU:$lhs, FrameOrU:$rhs, StrScalar:$lhsOn, StrScalar:$rhsOn);
     let results = (outs FrameOrU:$res);
@@ -490,7 +493,7 @@ def Daphne_AllAggStddevOp : Daphne_AllAggOp<"stddevAll", NumScalar, [ValueTypeFr
 // Aggregation MorphStore
 // ----------------------------------------------------------------------------
 
-def Daphne_MorphStoreAggSumOp    : Daphne_AllAggOp<"sumMorph", NumScalar, [ValueTypeFromFirstArg]>;
+def Daphne_MorphStoreAggSumOp    : Daphne_AllAggOp<"sumMorph", NumScalar, [ValueTypeFromFirstArg, VectorExtensionSupport]>;
 
 // ----------------------------------------------------------------------------
 // Row/column-wise aggregation

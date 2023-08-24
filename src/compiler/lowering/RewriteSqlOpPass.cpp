@@ -15,6 +15,7 @@
  */
 #include <parser/sql/SQLParser.h>
 #include <parser/sql/morphstore/MorphStoreSQLParser.h>
+#include "api/cli/DaphneUserConfig.h"
 #include "ir/daphneir/Daphne.h"
 #include "ir/daphneir/Passes.h"
 
@@ -38,9 +39,9 @@ namespace
 
     std::unordered_map <std::string, mlir::Value> tables;
     struct SqlReplacement : public RewritePattern{
-
-        SqlReplacement(MLIRContext * context, PatternBenefit benefit = 1)
-        : RewritePattern(Pattern::MatchAnyOpTypeTag(), benefit, context)
+        const DaphneUserConfig& cfg;
+        SqlReplacement(MLIRContext * context, const DaphneUserConfig& cfg, PatternBenefit benefit = 1)
+        : RewritePattern(Pattern::MatchAnyOpTypeTag(), benefit, context), cfg(cfg)
         {}
 
         LogicalResult matchAndRewrite(
@@ -57,8 +58,7 @@ namespace
                 rewriter.eraseOp(op);
                 return success();
             }else if(auto sqlop = llvm::dyn_cast<mlir::daphne::SqlOp>(op)){
-
-#ifndef USE_MORPHSTORE
+            if(!cfg.use_columnar){
                 std::stringstream sql_query;
                 sql_query << sqlop.getSql().str();
 
@@ -79,7 +79,7 @@ namespace
                 // TODO Why is this necessary when we have already replaced the op?
                 rewriter.replaceAllUsesWith(op->getResult(0), result_op);
                 return success();
-#else
+            } else {
                 std::stringstream sql_query;
                 sql_query << sqlop.getSql().str();
 
@@ -100,15 +100,19 @@ namespace
                 rewriter.replaceOp(op, result_op);
                 rewriter.replaceAllUsesWith(op->getResult(0), result_op);
                 return success();
-#endif
             }
             return failure();
         }
+    };
     };
 
     struct RewriteSqlOpPass
     : public PassWrapper <RewriteSqlOpPass, OperationPass<ModuleOp>>
     {
+        const DaphneUserConfig& cfg;
+        explicit RewriteSqlOpPass(const DaphneUserConfig& cfg) : cfg(cfg) {
+        }
+
         void runOnOperation() final;
     };
 }
@@ -123,13 +127,13 @@ void RewriteSqlOpPass::runOnOperation()
     target.addLegalOp<ModuleOp, func::FuncOp>();
     target.addIllegalOp<mlir::daphne::SqlOp, mlir::daphne::RegisterViewOp>();
 
-    patterns.add<SqlReplacement>(&getContext());
+    patterns.add<SqlReplacement>(&getContext(), cfg);
 
     if (failed(applyPartialConversion(module, target, std::move(patterns))))
         signalPassFailure();
 }
 
-std::unique_ptr<Pass> daphne::createRewriteSqlOpPass()
+std::unique_ptr<Pass> daphne::createRewriteSqlOpPass(const DaphneUserConfig& cfg)
 {
-    return std::make_unique<RewriteSqlOpPass>();
+    return std::make_unique<RewriteSqlOpPass>(cfg);
 }

@@ -23,34 +23,35 @@
 #include <core/storage/column.h>
 #include "core/operators/otfly_derecompr/join_uncompr.h"
 #include "core/operators/otfly_derecompr/project.h"
-#include "runtime/local/datastructures/Frame.h"
+#include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Frame.h>
 #include <core/operators/otfly_derecompr/intersect_tuples.h>
 #include "core/morphing/uncompr.h"
 #include "core/utils/printing.h"
 
 
 /// The implemented Semijoin is a Left Semijoin.
-template<class DTRes, class DTInLeft, class DTInRight>
+template<class DTRes, class DTInLeft, class DTInRight, typename ve>
 class Naturaljoin {
 public:
     static void apply(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char ** inOnLeft, size_t numLhsOn, const char ** inOnRight, size_t numRhsOn) = delete;
     static void apply(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTInLeft, class DTInRight, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTInLeft, class DTInRight, typename ve>
 void naturaljoin(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char ** inOnLeft, size_t numLhsOn, const char ** inOnRight, size_t numRhsOn) {
-    Naturaljoin<DTRes, DTInLeft, DTInRight>::apply(res, inLeft, inRight, inOnLeft, numLhsOn, inOnRight, numRhsOn);
+    Naturaljoin<DTRes, DTInLeft, DTInRight, ve>::apply(res, inLeft, inRight, inOnLeft, numLhsOn, inOnRight, numRhsOn);
 }
 
-template<class DTRes, class DTInLeft, class DTInRight, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTInLeft, class DTInRight, typename ve>
 void naturaljoin(DTRes * & res, const DTInLeft * inLeft, const DTInRight * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) {
-    Naturaljoin<DTRes, DTInLeft, DTInRight>::apply(res, inLeft, inRight, inOnLeft, inOnRight, ctx);
+    Naturaljoin<DTRes, DTInLeft, DTInRight, ve>::apply(res, inLeft, inRight, inOnLeft, inOnRight, ctx);
 }
 
-template<>
-class Naturaljoin<Frame, Frame, Frame> {
+template<typename ve>
+class Naturaljoin<Frame, Frame, Frame, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(Frame * & res, const Frame * inLeft, const Frame * inRight, const char ** inOnLeft, size_t numLhsOn, const char ** inOnRight, size_t numRhsOn) {
 
         assert((numLhsOn == numRhsOn) && "incorrect amount of compare values");
@@ -134,7 +135,6 @@ public:
 
     }
 
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(Frame * & res, const Frame * inLeft, const Frame * inRight, const char * inOnLeft, const char * inOnRight, DCTX(ctx)) {
 
         const morphstore::column<morphstore::uncompr_f> *selectPosLeft= nullptr;

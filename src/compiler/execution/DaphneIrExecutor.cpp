@@ -78,9 +78,15 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module)
             if(userConfig_.explain_parsing_simplified)
                 pm.addPass(mlir::daphne::createPrintIRPass("IR after parsing and some simplifications:"));
 
-            pm.addPass(mlir::daphne::createRewriteSqlOpPass()); // calls SQL Parser
+            pm.addPass(mlir::daphne::createRewriteSqlOpPass(userConfig_)); // calls SQL Parser
             if(userConfig_.explain_sql)
                 pm.addPass(mlir::daphne::createPrintIRPass("IR after SQL parsing:"));
+
+#if defined USE_AVX512 || defined USE_AVX2 || defined USE_SSE || defined USE_SCALAR
+            if(userConfig_.use_columnar) {
+                pm.addNestedPass<mlir::func::FuncOp>(mlir::daphne::createMarkVectorExtensionOpsPass(userConfig_));
+            }
+#endif           
 
             pm.addPass(mlir::daphne::createSpecializeGenericFunctionsPass(userConfig_));
             if(userConfig_.explain_property_inference)
@@ -222,6 +228,35 @@ std::unique_ptr<mlir::ExecutionEngine> DaphneIrExecutor::createExecutionEngine(m
             sharedLibRefs.emplace_back(sharedLibRefPaths.back());
         }
 #endif
+
+#ifdef USE_AVX512
+        if(userConfig_.use_columnar) {
+            sharedLibRefPaths.push_back(std::string(daphne_executable_dir + "/../lib/libAVX512Kernels.so"));
+            sharedLibRefs.emplace_back(sharedLibRefPaths.back());
+        }
+#endif
+
+#ifdef USE_AVX2
+        if(userConfig_.use_columnar) {
+            sharedLibRefPaths.push_back(std::string(daphne_executable_dir + "/../lib/libAVX2Kernels.so"));
+            sharedLibRefs.emplace_back(sharedLibRefPaths.back());
+        }
+#endif
+
+#ifdef USE_SSE
+        if(userConfig_.use_columnar) {
+            sharedLibRefPaths.push_back(std::string(daphne_executable_dir + "/../lib/libSSEKernels.so"));
+            sharedLibRefs.emplace_back(sharedLibRefPaths.back());
+        }
+#endif
+
+#ifdef USE_SCALAR
+        if(userConfig_.use_columnar) {
+            sharedLibRefPaths.push_back(std::string(daphne_executable_dir + "/../lib/libSCALARKernels.so"));
+            sharedLibRefs.emplace_back(sharedLibRefPaths.back());
+        }
+#endif
+
         registerLLVMDialectTranslation(context_);
         // module.dump();
         mlir::ExecutionEngineOptions options;

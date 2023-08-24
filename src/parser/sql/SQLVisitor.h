@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#ifndef DAPHNE_PROTOTYPE_SQLVISITOR_H
+#define DAPHNE_PROTOTYPE_SQLVISITOR_H
 #pragma once
 
 #include <parser/ParserUtils.h>
@@ -31,6 +32,17 @@
 #include <vector>
 #include <utility>
 
+bool isBitSet(int64_t flag, int64_t position);
+void setBit(int64_t& flag, int64_t position, int64_t val);
+void toggleBit(int64_t& flag, int64_t position);
+
+template<typename T>
+T fetch(std::unordered_map <std::string, T> x, const std::string& name);
+template<>
+std::string fetch<std::string>(
+    std::unordered_map <std::string, std::string> x,
+    const std::string& name
+);
 class SQLVisitor : public SQLGrammarVisitor {
 
     friend class MorphStoreSQLVisitor;
@@ -236,3 +248,4 @@ public:
 //literal
     antlrcpp::Any visitLiteral(SQLGrammarParser::LiteralContext * ctx) override;
 };
+#endif //SQLPARSER_SQLVISITOR_H

@@ -37,7 +37,7 @@
 // Struct for partial template specialization
 // ****************************************************************************
 
-template<class DTRes, class DTArg, typename VTSel>
+template<class DTRes, class DTArg, typename VTSel, typename ve>
 struct Project {
     static void apply(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) = delete;
 };
@@ -46,9 +46,9 @@ struct Project {
 // Convenience function
 // ****************************************************************************
 
-template<class DTRes, class DTArg, typename VTSel>
+template<class DTRes, class DTArg, typename VTSel, typename ve>
 void projectMorph(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) {
-    Project<DTRes, DTArg, VTSel>::apply(res, arg, sel, ctx);
+    Project<DTRes, DTArg, VTSel, ve>::apply(res, arg, sel, ctx);
 }
 
 // ****************************************************************************
@@ -59,9 +59,8 @@ void projectMorph(DTRes *& res, const DTArg * arg, const DenseMatrix<VTSel> * se
 // Frame <- Frame
 // ----------------------------------------------------------------------------
 
-template<typename VTSel>
-struct Project<Frame, Frame, VTSel> {
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<typename VTSel, typename ve>
+struct Project<Frame, Frame, VTSel, ve> {
     static void apply(Frame *& res, const Frame * arg, const DenseMatrix<VTSel> * sel, DCTX(ctx)) {
         auto colData =  reinterpret_cast<uint64_t const *>(sel->getValues());
         std::vector<uint64_t> positions;

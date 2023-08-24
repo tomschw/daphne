@@ -47,9 +47,9 @@ def PrintIR : Pass<"print-ir", "::mlir::func::FuncOp"> {
     let constructor = "mlir::daphne::createPrintIRPass()";
 }
 
-def RewriteSqlOpPass : Pass<"rewrite-sqlop", "::mlir::func::FuncOp"> {
-    let constructor = "mlir::daphne::createRewriteSqlOpPass()";
-}
+//def RewriteSqlOpPass : Pass<"rewrite-sqlop", "::mlir::func::FuncOp"> {
+//    let constructor = "mlir::daphne::createRewriteSqlOpPass()";
+//}
 
 def WhileLoopInvariantCodeMotionPass : Pass<"while-loop-invariant-code-motion", "::mlir::func::FuncOp"> {
     let constructor = "mlir::daphne::createWhileLoopInvariantCodeMotionPass()";

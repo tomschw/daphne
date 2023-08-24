@@ -27,6 +27,10 @@
 #include "core/operators/otfly_derecompr/merge.h"
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/BinaryOpCode.h>
+#include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Matrix.h>
+#include <runtime/local/datastructures/Frame.h>
 
 #include <ir/daphneir/Daphne.h>
 
@@ -43,25 +47,25 @@
 //using mlir::daphne::CompareOperation;
 
 
-template<class DTRes, class DTLhs, typename VTRhs=uint64_t>
+template<class DTRes, class DTLhs, typename VTRhs, typename ve>
 class SelectBinary {
   public:
     static void apply(DTRes * & res, const DTLhs * in, const char * inOn, BinaryOpCode cmp, VTRhs selValue) = delete;
     static void apply(BinaryOpCode cmp, DTRes * & res, const DTLhs * in, VTRhs selValue, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTIn, typename VTRhs=uint64_t, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTIn, typename VTRhs=uint64_t, typename ve>
 void selectBinary(DTRes * & res, const DTIn * in, const char * inOn, BinaryOpCode cmp, VTRhs selValue) {
-    SelectBinary<DTRes, DTIn, VTRhs>::apply(res, in, inOn, cmp, selValue);
+    SelectBinary<DTRes, DTIn, VTRhs, ve>::apply(res, in, inOn, cmp, selValue);
 }
 
 template<class DTRes, class DTIn, typename VTRhs=uint64_t, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
 void selectBinary(BinaryOpCode cmp, DTRes * & res, const DTIn * in, VTRhs selValue, DCTX(ctx)) {
-    SelectBinary<DTRes, DTIn, VTRhs>::apply(cmp, res, in, selValue, ctx);
+    SelectBinary<DTRes, DTIn, VTRhs, ve>::apply(cmp, res, in, selValue, ctx);
 }
-
-template<>
-class SelectBinary<Frame, Frame> {
+/**
+template<typename ve>
+class SelectBinary<Frame, Frame, ve> {
     public:
         template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
         static void apply(Frame * & res, const Frame * in, const char * inOn, BinaryOpCode cmp, uint64_t selValue) {
@@ -253,11 +257,10 @@ public:
     }
 
 };
-
-template<typename VT>
-class SelectBinary<DenseMatrix<VT>, DenseMatrix<VT>, VT> {
+**/
+template<typename VT, typename ve>
+class SelectBinary<DenseMatrix<VT>, DenseMatrix<VT>, VT, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(BinaryOpCode cmp, DenseMatrix<VT> * & res, const DenseMatrix<VT> * in, VT selValue, DCTX(ctx)) {
         const morphstore::column<morphstore::uncompr_f> * const selectCol = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * in->getNumRows(), reinterpret_cast<const uint64_t*>(in->getValues()));
 

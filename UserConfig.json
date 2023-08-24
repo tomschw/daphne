@@ -1,4 +1,5 @@
 {
+    "use_columnar": false,
     "use_cuda": false,
     "use_vectorized_exec": false,
     "use_obj_ref_mgnt": true,
@@ -15,6 +16,7 @@
     "explain_vectorized": false,
     "explain_obj_ref_mgnt": false,
     "taskPartitioningScheme": "STATIC",
+    "vector_extension": "SCALAR",
     "numberOfThreads": -1,
     "minimumTaskSize": 1,
     "library_paths": [],

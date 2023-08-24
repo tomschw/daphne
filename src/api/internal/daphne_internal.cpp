@@ -25,6 +25,7 @@
 #include <parser/daphnedsl/DaphneDSLParser.h>
 #include "compiler/execution/DaphneIrExecutor.h"
 #include <runtime/local/vectorized/LoadPartitioning.h>
+#include <runtime/local/kernels/MorphStore/VectorExtensions.h>
 #include <parser/config/ConfigParser.h>
 #include <util/DaphneLogger.h>
 
@@ -207,6 +208,25 @@ int startDAPHNE(int argc, const char** argv, DaphneLibResult* daphneLibRes, int 
             "debug-mt", cat(schedulingOptions),
             desc("Prints debug information about the Multithreading Wrapper")
     );
+
+    // Columnar operations
+    static opt<VectorExtensions> vectorExtension("vector_extension",
+            cat(daphneOptions), desc("Choose vector extension to use for columnar operations when enabled."),
+            values(
+                clEnumVal(SCALAR, "Using scalar instructions"),
+                clEnumVal(SSE, "Using SSE instructions"),
+                clEnumVal(AVX2, "Using AVX2 instructions"),
+                clEnumValN(AVX512_, "AVX512", "Using AVX512 instructions")
+            ),
+            init(SCALAR)
+    );
+
+    static opt<bool> useColumnar(
+            "columnar", cat(daphneOptions),
+            desc(
+                "Enable the switch to use columnar operations with possible SIMD support "
+                "instead of matrix operations with all optimizations.")
+    );
     
     // Other options
     
@@ -374,6 +394,8 @@ int startDAPHNE(int argc, const char** argv, DaphneLibResult* daphneLibRes, int 
     user_config.debugMultiThreading = debugMultiThreading;
     user_config.prePartitionRows = prePartitionRows;
     user_config.distributedBackEndSetup = distributedBackEndSetup;
+    user_config.vector_extension = vectorExtension;
+    user_config.use_columnar = useColumnar;
     if(user_config.use_distributed)
     {
         if(user_config.distributedBackEndSetup!=ALLOCATION_TYPE::DIST_MPI &&  user_config.distributedBackEndSetup!=ALLOCATION_TYPE::DIST_GRPC)

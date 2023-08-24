@@ -24,26 +24,27 @@
 #include <core/storage/column.h>
 #include "core/operators/otfly_derecompr/between.h"
 #include "core/operators/otfly_derecompr/project.h"
-#include "runtime/local/datastructures/Frame.h"
+#include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Frame.h>
 #include "core/morphing/uncompr.h"
 
 #include <ir/daphneir/Daphne.h>
 
-template<class DTRes, class DTIn>
+template<class DTRes, class DTIn, typename ve>
 class Between {
 public:
     static void apply(DTRes * & res, const DTIn * in, const char * inOn, uint64_t lowerBound, CompareOperation cmpLower, uint64_t upperBound, CompareOperation cmpUpper) = delete;
 };
 
-template<class DTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTIn, typename ve>
 void between(DTRes * & res, const DTIn * in, const char * inOn, uint64_t lowerBound, CompareOperation cmpLower, uint64_t upperBound, CompareOperation cmpUpper) {
-    Between<DTRes, DTIn>::template apply<ve>(res, in, inOn, lowerBound, cmpLower, upperBound, cmpUpper);
+    Between<DTRes, DTIn, ve>::template apply<ve>(res, in, inOn, lowerBound, cmpLower, upperBound, cmpUpper);
 }
 
-template<>
-class Between<Frame, Frame> {
+template<typename ve>
+class Between<Frame, Frame, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(Frame * & res, const Frame * in, const char * inOn, uint64_t lowerBound, CompareOperation cmpLower, uint64_t upperBound, CompareOperation cmpUpper) {
         auto colData = static_cast<uint64_t const *>(in->getColumnRaw(in->getColumnIdx(inOn)));
         const morphstore::column<morphstore::uncompr_f> * const betweenCol = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * in->getNumRows(), colData);

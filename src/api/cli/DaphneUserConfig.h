@@ -19,6 +19,7 @@
 
 #include <api/daphnelib/DaphneLibResult.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
+#include <runtime/local/kernels/MorphStore/VectorExtensions.h>
 #include <runtime/local/datastructures/IAllocationDescriptor.h>
 #include <util/LogConfig.h>
 #include <util/DaphneLogger.h>
@@ -35,6 +36,7 @@ class DaphneLogger;
 struct DaphneUserConfig {
     // Remember to update UserConfig.json accordingly!
 
+    bool use_columnar = false;
     bool use_cuda = false;
     bool use_vectorized_exec = false;
     bool use_distributed = false;
@@ -66,6 +68,7 @@ struct DaphneUserConfig {
     QueueTypeOption queueSetupScheme = CENTRALIZED;
 	VictimSelectionLogic victimSelection = SEQPRI;
     ALLOCATION_TYPE distributedBackEndSetup= ALLOCATION_TYPE::DIST_MPI; // default value
+    VectorExtensions vector_extension = VectorExtensions::SCALAR;
     int numberOfThreads = -1;
     int minimumTaskSize = 1;
     // minimum considered log level (e.g., no logging below INFO (essentially suppressing DEBUG and TRACE)

@@ -26,22 +26,24 @@
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/AggOpCode.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Frame.h>
+#include <runtime/local/datastructures/Matrix.h>
 
-template<typename VTRes, class DTIn>
+template<typename VTRes, class DTIn, typename ve>
 class AggSum {
 public:
     static VTRes apply(AggOpCode agg, const DTIn * in, DCTX(ctx)) = delete;
 };
 
-template<typename VTRes, class DTIn, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<typename VTRes, class DTIn, typename ve>
 VTRes aggMorph(AggOpCode agg, const DTIn * in, DCTX(ctx)) {
-    return AggSum<VTRes, DTIn>::apply(agg, in, ctx);
+    return AggSum<VTRes, DTIn, ve>::apply(agg, in, ctx);
 }
 
-template<typename VTRes, typename VTArg>
-class AggSum<VTRes, DenseMatrix<VTArg>> {
+template<typename VTRes, typename VTArg, typename ve>
+class AggSum<VTRes, DenseMatrix<VTArg>, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static VTRes apply(AggOpCode agg, const DenseMatrix<VTArg> * in, DCTX(ctx)) {
         auto colData = reinterpret_cast<const uint64_t*>(in->getValues());
         const morphstore::column<morphstore::uncompr_f> * const aggCol = new morphstore::column<morphstore::uncompr_f>(sizeof(uint64_t) * in->getNumRows(), colData);

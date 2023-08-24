@@ -15,7 +15,6 @@
  */
 
 #include <parser/sql/morphstore/MorphStoreSQLVisitor.h>
-#include <parser/sql/SQLVisitor.cpp>
 
 antlrcpp::Any MorphStoreSQLVisitor::visitCmpExpr(
         SQLGrammarParser::CmpExprContext * ctx

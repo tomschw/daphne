@@ -26,27 +26,28 @@
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/BinaryOpCode.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/datagen/GenGivenVals.h>
 
 #include <ir/daphneir/Daphne.h>
 
 
-template<class DTRes, class DTLhs, class DTRhs>
+template<class DTRes, class DTLhs, class DTRhs, typename ve>
 class AndMorph {
 public:
     static void apply(DTRes * & res, const DTLhs * inLhs, const DTRhs inRhs, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTLhs, class DTRhs, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTLhs, class DTRhs, typename ve>
 void andMorph(DTRes * & res, const DTLhs * inLhs, const DTRhs * inRhs, DCTX(ctx)) {
-    AndMorph<DTRes, DTLhs, DTRhs>::apply(res, inLhs, inRhs, ctx);
+    AndMorph<DTRes, DTLhs, DTRhs, ve>::apply(res, inLhs, inRhs, ctx);
 }
 
 
-template<typename VTRes, typename VTLhs, typename VTRhs>
-class AndMorph<DenseMatrix<VTRes>, DenseMatrix<VTLhs>, DenseMatrix<VTRhs>> {
+template<typename VTRes, typename VTLhs, typename VTRhs, typename ve>
+class AndMorph<DenseMatrix<VTRes>, DenseMatrix<VTLhs>, DenseMatrix<VTRhs>, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(DenseMatrix<VTRes> * & res, const DenseMatrix<VTLhs> * inLhs, const DenseMatrix<VTRhs> * inRhs, DCTX(ctx)) {
         assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
 

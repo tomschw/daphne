@@ -26,6 +26,8 @@
 #include "core/morphing/uncompr.h"
 #include <runtime/local/kernels/BinaryOpCode.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/DataObjectFactory.h>
+#include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/datagen/GenGivenVals.h>
 
 #include <ir/daphneir/Daphne.h>
@@ -37,15 +39,15 @@ enum class CalcOperation : uint32_t {
     Div = 4,
 };
 
-template<class DTRes, class DTLhs, class DTRhs>
+template<class DTRes, class DTLhs, class DTRhs, typename ve>
 class Calc {
 public:
     static void apply(BinaryOpCode calc, DTRes * & res, const DTLhs * inLhs, const DTRhs inRhs, DCTX(ctx)) = delete;
 };
 
-template<class DTRes, class DTLhs, class DTRhs, typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
+template<class DTRes, class DTLhs, class DTRhs, typename ve>
 void calcBinary(BinaryOpCode calc, DTRes * & res, const DTLhs * inLhs, const DTRhs * inRhs, DCTX(ctx)) {
-    Calc<DTRes, DTLhs, DTRhs>::apply(calc, res, inLhs, inRhs, ctx);
+    Calc<DTRes, DTLhs, DTRhs, ve>::apply(calc, res, inLhs, inRhs, ctx);
 }
 
 /**template<>
@@ -126,10 +128,9 @@ public:
 
 }; **/
 
-template<typename VTRes, typename VTLhs, typename VTRhs>
-class Calc<DenseMatrix<VTRes>, DenseMatrix<VTLhs>, DenseMatrix<VTRhs>> {
+template<typename VTRes, typename VTLhs, typename VTRhs, typename ve>
+class Calc<DenseMatrix<VTRes>, DenseMatrix<VTLhs>, DenseMatrix<VTRhs>, ve> {
 public:
-    template<typename ve=vectorlib::scalar<vectorlib::v64<uint64_t>>>
     static void apply(BinaryOpCode calc, DenseMatrix<VTRes> * & res, const DenseMatrix<VTLhs> * inLhs, const DenseMatrix<VTRhs> * inRhs, DCTX(ctx)) {
         assert((inLhs->getNumRows() == inRhs->getNumRows()) && "number of input rows not the same");
 

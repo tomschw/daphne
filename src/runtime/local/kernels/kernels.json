@@ -3740,7 +3740,7 @@
     },
     {
         "kernelTemplate": {
-            "header": "MorphStore/selectBinary.h",
+            "header": "selectBinary.h",
             "opName": "selectBinary",
             "returnType": "void",
             "templateParams": [
@@ -3778,7 +3778,7 @@
         },
         "api": [
             {
-                "name":  ["CUDA", "CPP"],
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],
                 "instantiations": [
                     [["DenseMatrix", "int64_t"], ["DenseMatrix", "int64_t"], "int64_t"]
                 ],
@@ -3812,7 +3812,7 @@
     },
     {
         "kernelTemplate": {
-            "header": "MorphStore/sum.h",
+            "header": "sum.h",
             "opName": "aggMorph",
             "returnType": "VTRes",
             "templateParams": [
@@ -3836,14 +3836,19 @@
                 }
             ]
         },
-        "instantiations": [
-            ["int64_t", ["DenseMatrix", "int64_t"]]
-        ],
-        "opCodes": ["SUM"]
+        "api": [
+            {
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],
+                "instantiations": [
+                    ["int64_t", ["DenseMatrix", "int64_t"]]
+                ],
+                "opCodes": ["SUM"]
+            }
+        ]
     },
     {
         "kernelTemplate": {
-            "header": "MorphStore/calc.h",
+            "header": "calc.h",
             "opName": "calcBinary",
             "returnType": "void",
             "templateParams": [
@@ -3881,7 +3886,7 @@
         },
         "api": [
             {
-                "name":  ["CPP"],
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],
                 "instantiations": [
                     [["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"]],
                     [["DenseMatrix", "int64_t"], ["DenseMatrix", "int64_t"], ["DenseMatrix", "int64_t"]]
@@ -3892,7 +3897,7 @@
     },
     {
         "kernelTemplate": {
-            "header": "MorphStore/project.h",
+            "header": "project.h",
             "opName": "projectMorph",
             "returnType": "void",
             "templateParams": [
@@ -3924,27 +3929,45 @@
                 }
             ]
         },
-        "instantiations": [
-            ["Frame", "Frame", "int64_t"]
+        "api": [
+            {
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],
+                "instantiations": [
+                    ["Frame", "Frame", "int64_t"]
+                ]
+            }
         ]
     },
     {
     	"kernelTemplate": {
-    		"header": "MorphStore/naturaljoin.h",
+    		"header": "naturaljoin.h",
     		"opName": "naturaljoin",
     		"returnType": "void",
-    		"templateParams": [],
+    		"templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTInLeft",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTInRight",
+                    "isDataType": true
+                }
+            ],
     		"runtimeParams": [
     			{
-    				"type": "Frame *&",
+    				"type": "DTRes *&",
     				"name": "res"
     			},
     			{
-    				"type": "const Frame *",
+    				"type": "const DTInLeft *",
     				"name": "lhs"
     			},
     			{
-    				"type": "const Frame *",
+    				"type": "const DTInRight *",
     				"name": "rhs"
     			},
     			{
@@ -3957,13 +3980,18 @@
     			}
     		]
     	},
-    	"instantiations": [
-    		[]
-    	]
+        "api" : [    
+            {   
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],                         
+                "instantiations": [
+                ["Frame", "Frame", "Frame"]
+            ]
+            }
+        ]
     },
     {
         "kernelTemplate": {
-            "header": "MorphStore/and.h",
+            "header": "and.h",
             "opName": "andMorph",
             "returnType": "void",
             "templateParams": [
@@ -3997,7 +4025,7 @@
         },
         "api": [
             {
-                "name":  ["CPP"],
+                "name":  ["AVX512", "AVX2", "SCALAR", "SSE"],
                 "instantiations": [
                     [["DenseMatrix", "float"], ["DenseMatrix", "float"], ["DenseMatrix", "float"]],
                     [["DenseMatrix", "double"], ["DenseMatrix", "double"], ["DenseMatrix", "double"]],

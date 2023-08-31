@@ -228,6 +228,12 @@ int startDAPHNE(int argc, const char** argv, DaphneLibResult* daphneLibRes, int 
                 "instead of matrix operations with all optimizations.")
     );
     
+    static opt<bool> useSelectionPushdown(
+            "selection_pushdown", cat(daphneOptions),
+            desc(
+                "Enable the switch to use columnar operations with possible SIMD support "
+                "instead of matrix operations.")
+    );
     // Other options
     
     static opt<bool> noObjRefMgnt(
@@ -396,6 +402,7 @@ int startDAPHNE(int argc, const char** argv, DaphneLibResult* daphneLibRes, int 
     user_config.distributedBackEndSetup = distributedBackEndSetup;
     user_config.vector_extension = vectorExtension;
     user_config.use_columnar = useColumnar;
+    user_config.use_selection_pushdown = useSelectionPushdown;
     if(user_config.use_distributed)
     {
         if(user_config.distributedBackEndSetup!=ALLOCATION_TYPE::DIST_MPI &&  user_config.distributedBackEndSetup!=ALLOCATION_TYPE::DIST_GRPC)

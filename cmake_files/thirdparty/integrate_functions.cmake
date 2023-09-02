@@ -1,7 +1,7 @@
 macro(target_add_morphstore target)
     target_compile_options(${target} PUBLIC -DMSV_NO_SELFMANAGED_MEMORY)
     target_include_directories(${target} PUBLIC ${MorphStoreRoot}/include)
-    target_compile_options(${target} PUBLIC -march=tigerlake )
+    target_compile_options(${target} PUBLIC -march=native )
     target_compile_definitions(${target} PUBLIC AVX512)
     target_sources(${target} PUBLIC ${MorphStoreRoot}/include/core/memory/MemoryManager.cpp)
 endmacro()

@@ -318,7 +318,7 @@ def Daphne_EwGeOp  : Daphne_EwCmpOp<"ewGe" , AnyScalar>;
 // ----------------------------------------------------------------------------
 
 class Daphne_MorphStoreCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
-: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeFromArgs, VectorExtensionSupport])> {
+: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeFromArgs, VectorExtensionSupport, Pure])> {
 // TODO: We do not enforce (matrix of) boolean output any more, but should
 // think about that again.
 //let results = (outs AnyTypeOf<[MatrixOf<[BoolScalar]>, BoolScalar]>:$res);
@@ -349,14 +349,15 @@ def Daphne_MorphDivOp    : Daphne_EwBinaryOp<"calcDiv", NumScalar, [ValueTypeFro
     let hasCanonicalizeMethod = 1;
 }
 
-def Daphne_MorphAndOp    : Daphne_EwBinaryOp<"andMorph", NumScalar, [Commutative, ValueTypeFromArgsInt, VectorExtensionSupport]>;
+def Daphne_MorphAndOp    : Daphne_EwBinaryOp<"andMorph", NumScalar, [Commutative, ValueTypeFromArgsInt, VectorExtensionSupport, Pure]>;
 
 
 def Daphne_ProjectOp : Daphne_Op<"projectMorph", [
     TypeFromFirstArg,
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
     NumColsFromArg,
-    VectorExtensionSupport
+    VectorExtensionSupport,
+    Pure
 ]> {
     let summary = "Filters the rows of a data object according to a bit vector";
 

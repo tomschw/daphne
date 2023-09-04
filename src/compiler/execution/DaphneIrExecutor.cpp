@@ -82,15 +82,18 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module)
             if(userConfig_.explain_sql)
                 pm.addPass(mlir::daphne::createPrintIRPass("IR after SQL parsing:"));
 
+            pm.addPass(mlir::daphne::createSpecializeGenericFunctionsPass(userConfig_));
+
+            if(userConfig_.use_selection_pushdown) {
+                pm.addPass(mlir::daphne::createSelectionPushdownPass());
+            }
+
 #if defined USE_AVX512 || defined USE_AVX2 || defined USE_SSE || defined USE_SCALAR
             if(userConfig_.use_columnar) {
                 pm.addNestedPass<mlir::func::FuncOp>(mlir::daphne::createMarkVectorExtensionOpsPass(userConfig_));
             }
 #endif           
 
-            pm.addPass(mlir::daphne::createSpecializeGenericFunctionsPass(userConfig_));
-
-            pm.addPass(mlir::daphne::createSelectionPushdownPass());
             if(userConfig_.explain_property_inference)
                 pm.addPass(mlir::daphne::createPrintIRPass("IR after inference:"));
 

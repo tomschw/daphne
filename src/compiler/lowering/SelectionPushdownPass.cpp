@@ -31,17 +31,17 @@ namespace
         return columnName;
     }
 
-    mlir::daphne::FilterRowOp restructureComparisonsBeforeJoin(PatternRewriter &rewriter, std::vector<Operation *> comparisons, Operation * join, OpResult joinData) {
+    mlir::daphne::ProjectOp restructureComparisonsBeforeJoin(PatternRewriter &rewriter, std::vector<Operation *> comparisons, Operation * join, OpResult joinData) {
         Operation * tempOp = nullptr;
         for (Operation * comparison : comparisons) {
             if (tempOp == nullptr) {
                 tempOp = comparison;
             } else {
-                auto newEwAndOp = rewriter.create<mlir::daphne::EwAndOp>(comparison->getLoc(), comparison->getResult(0).getType(), tempOp->getResult(0), comparison->getResult(0));
+                auto newEwAndOp = rewriter.create<mlir::daphne::MorphAndOp>(comparison->getLoc(), comparison->getResult(0).getType(), tempOp->getResult(0), comparison->getResult(0));
                 tempOp = newEwAndOp;
             }
         }
-        auto newFilterRowOp = rewriter.create<mlir::daphne::FilterRowOp>(tempOp->getLoc(), joinData.getType(), joinData, tempOp->getResult(0));
+        auto newFilterRowOp = rewriter.create<mlir::daphne::ProjectOp>(tempOp->getLoc(), joinData.getType(), joinData, tempOp->getResult(0));
         //join->setOperand(0, newFilterRowOp->getResult(0));
         join->replaceUsesOfWith(joinData, newFilterRowOp->getResult(0));
         //join->moveAfter(newFilterRowOp);
@@ -50,12 +50,12 @@ namespace
     }
 
     bool checkIfBitmapOp(Operation * op) {
-        if (llvm::dyn_cast<mlir::daphne::EwLtOp>(op) 
-        || llvm::dyn_cast<mlir::daphne::EwGtOp>(op)
-        || llvm::dyn_cast<mlir::daphne::EwEqOp>(op)
-        || llvm::dyn_cast<mlir::daphne::EwNeqOp>(op)
-        || llvm::dyn_cast<mlir::daphne::EwLeOp>(op)
-        || llvm::dyn_cast<mlir::daphne::EwGeOp>(op)) {
+        if (llvm::dyn_cast<mlir::daphne::MorphStoreSelectLtOp>(op) 
+        || llvm::dyn_cast<mlir::daphne::MorphStoreSelectGtOp>(op)
+        || llvm::dyn_cast<mlir::daphne::MorphStoreSelectEqOp>(op)
+        || llvm::dyn_cast<mlir::daphne::MorphStoreSelectNeqOp>(op)
+        || llvm::dyn_cast<mlir::daphne::MorphStoreSelectLeOp>(op)
+        || llvm::dyn_cast<mlir::daphne::MorphStoreSelectGeOp>(op)) {
             return true;
         }
         return false;
@@ -103,11 +103,11 @@ namespace
                 }
             }
         }
-        mlir::daphne::FilterRowOp lhsFilterRowOp = nullptr;
+        mlir::daphne::ProjectOp lhsFilterRowOp = nullptr;
         if (!lhsComparisons.empty()) {
             lhsFilterRowOp = restructureComparisonsBeforeJoin(rewriter, lhsComparisons, joinSourceOp, lhsFrameJoin);         
         }
-        mlir::daphne::FilterRowOp rhsFilterRowOp = nullptr;
+        mlir::daphne::ProjectOp rhsFilterRowOp = nullptr;
         if (!rhsComparisons.empty()) {
             rhsFilterRowOp = restructureComparisonsBeforeJoin(rewriter, rhsComparisons, joinSourceOp, rhsFrameJoin);
         }
@@ -119,10 +119,10 @@ namespace
         joinSourceOp->moveAfter(firstFilterRowOp);
         rewriter.finalizeRootUpdate(filterRowOp);
 
-        if(llvm::dyn_cast<mlir::daphne::InnerJoinOp>(inputFrameOpLhs) && lhsFilterRowOp) {
+        if(llvm::dyn_cast<mlir::daphne::MorphJoinOp>(inputFrameOpLhs) && lhsFilterRowOp) {
             moveComparisonsBeforeJoin(rewriter, lhsFilterRowOp, lhsComparisons, firstFilterRowOp);
         }
-        if(llvm::dyn_cast<mlir::daphne::InnerJoinOp>(inputFrameOpRhs) && rhsFilterRowOp) {
+        if(llvm::dyn_cast<mlir::daphne::MorphJoinOp>(inputFrameOpRhs) && rhsFilterRowOp) {
             moveComparisonsBeforeJoin(rewriter, rhsFilterRowOp, rhsComparisons, firstFilterRowOp);
         }
 
@@ -142,12 +142,12 @@ namespace
             PatternRewriter &rewriter
         ) const override
         {
-            if(llvm::dyn_cast<mlir::daphne::FilterRowOp>(op)){
+            if(llvm::dyn_cast<mlir::daphne::ProjectOp>(op)){
                 //iterate through the second operand of the filterrowop
                 std::vector<Operation *> comparisons;
 
                 Operation * currentBitmap = op->getOperand(1).getDefiningOp();
-                while (llvm::dyn_cast<mlir::daphne::EwAndOp>(currentBitmap)) {
+                while (llvm::dyn_cast<mlir::daphne::MorphAndOp>(currentBitmap)) {
                     Operation * comparison = currentBitmap->getOperand(1).getDefiningOp();
                     comparisons.push_back(comparison);
                     currentBitmap = currentBitmap->getOperand(0).getDefiningOp();
@@ -176,9 +176,9 @@ void SelectionPushdownPass::runOnOperation() {
     target.addLegalDialect<arith::ArithDialect, LLVM::LLVMDialect, scf::SCFDialect, daphne::DaphneDialect>();
     target.addLegalOp<ModuleOp, func::FuncOp>();
 
-    target.addDynamicallyLegalOp<mlir::daphne::FilterRowOp>([&](Operation * op) {
+    target.addDynamicallyLegalOp<mlir::daphne::ProjectOp>([&](Operation * op) {
         Operation * dataSource = op->getOperand(0).getDefiningOp();
-        if (llvm::dyn_cast<mlir::daphne::InnerJoinOp>(dataSource)) {
+        if (llvm::dyn_cast<mlir::daphne::MorphJoinOp>(dataSource)) {
             //Currently not checking whether all comparisons beforehand are possible on the available frames without join
             return false;
         }
